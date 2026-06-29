@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Check,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 import { useOnboardingStore } from "@/components/providers/onboarding-provider";
 import { EmptyState } from "@/components/empty-state";
+import { LoadingState } from "@/components/loading-state";
 import { PageContainer } from "@/components/page-container";
 import { SectionHeader } from "@/components/section-header";
 import { Progress } from "@/components/ui/progress";
@@ -46,12 +48,19 @@ import {
 import { ExportDialog } from "@/components/onboarding/ExportDialog";
 
 export function ChecklistView({ id }: { id: string }) {
-  const { getOnboarding, setChecklistItemCompleted } = useOnboardingStore();
+  const {
+    getOnboarding,
+    setChecklistItemCompleted,
+    isLoading,
+    error,
+    refreshOnboardings,
+  } = useOnboardingStore();
   const onboarding = getOnboarding(id);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [sheetChecked, setSheetChecked] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   const rawProgress = onboarding ? calcProgress(onboarding.checklist) : 0;
 
@@ -59,6 +68,14 @@ export function ChecklistView({ id }: { id: string }) {
     const t = setTimeout(() => setAnimProgress(rawProgress), 300);
     return () => clearTimeout(t);
   }, [id, rawProgress]);
+
+  if (isLoading && !onboarding) {
+    return (
+      <PageContainer>
+        <LoadingState label="Laddar onboarding..." />
+      </PageContainer>
+    );
+  }
 
   if (!onboarding) {
     return (
@@ -70,12 +87,19 @@ export function ChecklistView({ id }: { id: string }) {
           </Link>
         </Button>
         <EmptyState
-          title="Onboardingen hittades inte"
-          description="Den här onboardingen finns inte längre i den aktiva sessionen."
+          title={error ? "Kunde inte ladda onboardingen" : "Onboardingen hittades inte"}
+          description={
+            error ??
+            "Den här onboardingen finns inte längre i den aktiva sessionen."
+          }
           action={
-            <Button asChild>
-              <Link href="/">Gå till startsidan</Link>
-            </Button>
+            error ? (
+              <Button onClick={() => void refreshOnboardings()}>Försök igen</Button>
+            ) : (
+              <Button asChild>
+                <Link href="/">Gå till startsidan</Link>
+              </Button>
+            )
           }
         />
       </PageContainer>
@@ -98,11 +122,26 @@ export function ChecklistView({ id }: { id: string }) {
     setSheetChecked(Boolean(item?.completedAt));
   }
 
-  function handleSaveItem() {
+  async function handleSaveItem() {
     if (!openItemId) return;
 
-    setChecklistItemCompleted(currentOnboarding.id, openItemId, sheetChecked);
-    setOpenItemId(null);
+    try {
+      setIsSaving(true);
+      await setChecklistItemCompleted(
+        currentOnboarding.id,
+        openItemId,
+        sheetChecked
+      );
+      setOpenItemId(null);
+    } catch (saveError) {
+      toast.error(
+        saveError instanceof Error
+          ? saveError.message
+          : "Kunde inte uppdatera checklistpunkten."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const fullName = `${currentOnboarding.firstName} ${currentOnboarding.lastName}`;
@@ -345,7 +384,11 @@ export function ChecklistView({ id }: { id: string }) {
                     Avbryt
                   </Button>
                 </SheetClose>
-                <Button onClick={handleSaveItem} className="w-full sm:w-auto">
+                <Button
+                  onClick={handleSaveItem}
+                  className="w-full sm:w-auto"
+                  disabled={isSaving}
+                >
                   Spara
                 </Button>
               </SheetFooter>

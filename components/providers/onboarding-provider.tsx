@@ -3,127 +3,121 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
-  useReducer,
+  useState,
   type ReactNode,
 } from "react";
 
 import {
-  INITIAL_ONBOARDINGS,
-  createOnboardingRecord,
-  getOnboardingById,
   sortOnboardings,
   type CreateOnboardingInput,
   type OnboardingRecord,
 } from "@/lib/onboarding";
-
-interface OnboardingState {
-  onboardings: OnboardingRecord[];
-}
-
-type OnboardingAction =
-  | {
-      type: "create";
-      payload: OnboardingRecord;
-    }
-  | {
-      type: "set-checklist-item-completed";
-      payload: {
-        onboardingId: string;
-        itemId: string;
-        completed: boolean;
-      };
-    };
+import {
+  createOnboarding,
+  listOnboardings,
+  updateChecklistItemCompletion,
+} from "@/lib/supabase/onboarding-repository";
 
 interface OnboardingContextValue {
   onboardings: OnboardingRecord[];
   ongoingOnboardings: OnboardingRecord[];
   completedOnboardings: OnboardingRecord[];
-  createOnboarding: (input: CreateOnboardingInput) => string;
+  isLoading: boolean;
+  error: string | null;
+  createOnboarding: (input: CreateOnboardingInput) => Promise<string>;
   setChecklistItemCompleted: (
     onboardingId: string,
     itemId: string,
     completed: boolean
-  ) => void;
+  ) => Promise<void>;
   getOnboarding: (id: string) => OnboardingRecord | undefined;
+  refreshOnboardings: () => Promise<void>;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
-function onboardingReducer(
-  state: OnboardingState,
-  action: OnboardingAction
-): OnboardingState {
-  switch (action.type) {
-    case "create":
-      return {
-        onboardings: [action.payload, ...state.onboardings],
-      };
-    case "set-checklist-item-completed":
-      return {
-        onboardings: state.onboardings.map((onboarding) => {
-          if (onboarding.id !== action.payload.onboardingId) {
-            return onboarding;
-          }
-
-          const checklist = onboarding.checklist.map((item) => {
-            if (item.id !== action.payload.itemId) {
-              return item;
-            }
-
-            return {
-              ...item,
-              completedAt: action.payload.completed
-                ? new Date().toISOString()
-                : null,
-            };
-          });
-
-          const allCompleted = checklist.every(
-            (item) => item.completedAt !== null
-          );
-
-          return {
-            ...onboarding,
-            checklist,
-            completedAt: allCompleted ? new Date().toISOString() : null,
-          };
-        }),
-      };
-    default:
-      return state;
-  }
-}
-
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(onboardingReducer, {
-    onboardings: INITIAL_ONBOARDINGS,
-  });
+  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { ongoing, completed } = useMemo(
-    () => sortOnboardings(state.onboardings),
-    [state.onboardings]
+    () => sortOnboardings(onboardings),
+    [onboardings]
   );
+
+  async function refreshOnboardings() {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await listOnboardings();
+      setOnboardings(data);
+    } catch (refreshError) {
+      setError(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Could not load onboardings."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshOnboardings();
+  }, []);
 
   const value = useMemo<OnboardingContextValue>(
     () => ({
-      onboardings: state.onboardings,
+      onboardings,
       ongoingOnboardings: ongoing,
       completedOnboardings: completed,
-      createOnboarding: (input) => {
-        const onboarding = createOnboardingRecord(input);
-        dispatch({ type: "create", payload: onboarding });
-        return onboarding.id;
+      isLoading,
+      error,
+      createOnboarding: async (input) => {
+        try {
+          const onboarding = await createOnboarding(input);
+          setOnboardings((current) => [onboarding, ...current]);
+          setError(null);
+          return onboarding.id;
+        } catch (createError) {
+          const message =
+            createError instanceof Error
+              ? createError.message
+              : "Could not create onboarding.";
+          setError(message);
+          throw new Error(message);
+        }
       },
-      setChecklistItemCompleted: (onboardingId, itemId, completed) => {
-        dispatch({
-          type: "set-checklist-item-completed",
-          payload: { onboardingId, itemId, completed },
-        });
+      setChecklistItemCompleted: async (onboardingId, itemId, completed) => {
+        try {
+          const updatedOnboarding = await updateChecklistItemCompletion(
+            onboardingId,
+            itemId,
+            completed
+          );
+
+          setOnboardings((current) =>
+            current.map((item) =>
+              item.id === updatedOnboarding.id ? updatedOnboarding : item
+            )
+          );
+          setError(null);
+        } catch (updateError) {
+          const message =
+            updateError instanceof Error
+              ? updateError.message
+              : "Could not update checklist item.";
+          setError(message);
+          throw new Error(message);
+        }
       },
-      getOnboarding: (id) => getOnboardingById(state.onboardings, id),
+      getOnboarding: (id) => onboardings.find((item) => item.id === id),
+      refreshOnboardings,
     }),
-    [completed, ongoing, state.onboardings]
+    [completed, error, isLoading, onboardings, ongoing]
   );
 
   return (

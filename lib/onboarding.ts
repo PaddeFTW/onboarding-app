@@ -126,16 +126,6 @@ export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   },
 ];
 
-export function createChecklist(completedCount = 0): ChecklistItem[] {
-  const completionStamp =
-    completedCount === CHECKLIST_TEMPLATE.length ? new Date().toISOString() : null;
-
-  return CHECKLIST_TEMPLATE.map((item, index) => ({
-    ...item,
-    completedAt: index < completedCount ? completionStamp ?? new Date().toISOString() : null,
-  }));
-}
-
 export function countCompleted(items: ChecklistItem[]): number {
   return items.filter((item) => item.completedAt !== null).length;
 }
@@ -174,60 +164,6 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-export function createOnboardingRecord(
-  input: CreateOnboardingInput
-): OnboardingRecord {
-  const now = new Date().toISOString();
-
-  return {
-    id: crypto.randomUUID(),
-    firstName: input.firstName.trim(),
-    lastName: input.lastName.trim(),
-    position: input.position.trim(),
-    manager: input.manager,
-    startDate: input.startDate,
-    createdAt: now,
-    completedAt: null,
-    checklist: createChecklist(0),
-  };
-}
-
-export const INITIAL_ONBOARDINGS: OnboardingRecord[] = [
-  {
-    id: "mock-1",
-    firstName: "Anders",
-    lastName: "Svensson",
-    position: "Elektriker",
-    manager: "Maria Lindqvist",
-    startDate: "2026-06-01",
-    createdAt: "2026-05-20T08:00:00.000Z",
-    completedAt: null,
-    checklist: createChecklist(7),
-  },
-  {
-    id: "mock-2",
-    firstName: "Fatima",
-    lastName: "Al-Hassan",
-    position: "Projektledare",
-    manager: "Erik Johansson",
-    startDate: "2026-06-16",
-    createdAt: "2026-06-05T08:00:00.000Z",
-    completedAt: null,
-    checklist: createChecklist(3),
-  },
-  {
-    id: "mock-completed",
-    firstName: "Johan",
-    lastName: "Berg",
-    position: "Systemutvecklare",
-    manager: "Anna Larsson",
-    startDate: "2026-05-15",
-    createdAt: "2026-05-05T08:00:00.000Z",
-    completedAt: "2026-05-28T13:15:00.000Z",
-    checklist: createChecklist(CHECKLIST_TEMPLATE.length),
-  },
-];
-
 export function sortOnboardings(onboardings: OnboardingRecord[]) {
   const ongoing = onboardings
     .filter((item) => item.completedAt === null)
@@ -245,11 +181,4 @@ export function sortOnboardings(onboardings: OnboardingRecord[]) {
     );
 
   return { ongoing, completed };
-}
-
-export function getOnboardingById(
-  onboardings: OnboardingRecord[],
-  id: string
-): OnboardingRecord | undefined {
-  return onboardings.find((item) => item.id === id);
 }

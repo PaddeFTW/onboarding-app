@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -30,22 +31,34 @@ export function NewOnboardingForm() {
   const { createOnboarding } = useOnboardingStore();
   const [loading, setLoading] = useState(false);
   const [manager, setManager] = useState("Maria Lindqvist");
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const onboardingId = createOnboarding({
-      firstName: String(formData.get("firstName") ?? ""),
-      lastName: String(formData.get("lastName") ?? ""),
-      startDate: String(formData.get("startDate") ?? ""),
-      position: String(formData.get("position") ?? ""),
-      manager,
-    });
+    try {
+      const formData = new FormData(e.currentTarget as HTMLFormElement);
+      const onboardingId = await createOnboarding({
+        firstName: String(formData.get("firstName") ?? ""),
+        lastName: String(formData.get("lastName") ?? ""),
+        startDate: String(formData.get("startDate") ?? ""),
+        position: String(formData.get("position") ?? ""),
+        manager,
+      });
 
-    await new Promise((r) => setTimeout(r, 750));
-    router.push(`/onboarding/${onboardingId}`);
+      router.push(`/onboarding/${onboardingId}`);
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : "Kunde inte skapa onboarding.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -127,6 +140,10 @@ export function NewOnboardingForm() {
               </SelectContent>
             </Select>
           </Field>
+
+          {error ? (
+            <p className="text-sm text-destructive">{error}</p>
+          ) : null}
         </CardContent>
 
         <CardFooter className="flex-col-reverse justify-end gap-2 border-t border-border/90 bg-secondary/20 pt-5 sm:flex-row">

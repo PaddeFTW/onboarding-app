@@ -6,12 +6,19 @@ import { Plus } from "lucide-react";
 import { PageContainer } from "@/components/page-container";
 import { SectionHeader } from "@/components/section-header";
 import { EmptyState } from "@/components/empty-state";
+import { LoadingState } from "@/components/loading-state";
 import { Button } from "@/components/ui/button";
 import { OnboardingCard } from "@/components/onboarding/OnboardingCard";
 import { useOnboardingStore } from "@/components/providers/onboarding-provider";
 
 export default function HomePage() {
-  const { ongoingOnboardings, completedOnboardings } = useOnboardingStore();
+  const {
+    ongoingOnboardings,
+    completedOnboardings,
+    isLoading,
+    error,
+    refreshOnboardings,
+  } = useOnboardingStore();
 
   return (
     <PageContainer className="relative flex flex-col gap-14 overflow-hidden sm:gap-16">
@@ -59,7 +66,15 @@ export default function HomePage() {
               : undefined
           }
         />
-        {ongoingOnboardings.length === 0 ? (
+        {isLoading ? (
+          <LoadingState variant="cards" count={2} />
+        ) : error ? (
+          <EmptyState
+            title="Kunde inte ladda onboardingar"
+            description={error}
+            action={<Button onClick={() => void refreshOnboardings()}>Försök igen</Button>}
+          />
+        ) : ongoingOnboardings.length === 0 ? (
           <EmptyState
             title="Inga pågående onboardingar"
             description="Starta en ny onboarding för att komma igång."
@@ -94,7 +109,15 @@ export default function HomePage() {
               : undefined
           }
         />
-        {completedOnboardings.length === 0 ? (
+        {isLoading ? (
+          <LoadingState variant="cards" count={1} />
+        ) : error ? (
+          <EmptyState
+            title="Kunde inte ladda slutförda onboardingar"
+            description={error}
+            action={<Button onClick={() => void refreshOnboardings()}>Försök igen</Button>}
+          />
+        ) : completedOnboardings.length === 0 ? (
           <EmptyState
             title="Inga slutförda onboardingar ännu"
             description="Slutförda onboardingar visas här när alla punkter är genomförda."
