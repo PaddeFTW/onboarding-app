@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -30,8 +30,12 @@ export function NewOnboardingForm() {
   const router = useRouter();
   const { createOnboarding } = useOnboardingStore();
   const [loading, setLoading] = useState(false);
-  const [manager, setManager] = useState("Maria Lindqvist");
+  const [manager, setManager] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const defaultStartDate = useMemo(
+    () => new Date().toISOString().slice(0, 10),
+    []
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +43,10 @@ export function NewOnboardingForm() {
     setError(null);
 
     try {
+      if (!manager) {
+        throw new Error("Välj ansvarig chef.");
+      }
+
       const formData = new FormData(e.currentTarget as HTMLFormElement);
       const onboardingId = await createOnboarding({
         firstName: String(formData.get("firstName") ?? ""),
@@ -67,11 +75,11 @@ export function NewOnboardingForm() {
         <CardContent className="flex flex-col gap-8 pt-6 sm:pt-7">
           <div className="flex flex-col gap-1.5">
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-primary/60">
-              Uppgifter
+              Grunduppgifter
             </p>
             <p className="max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
-              Börja med några enkla uppgifter. Checklistan skapas automatiskt
-              och kan fyllas i direkt efter att onboardingen skapats.
+              Ange medarbetarens grunduppgifter. Checklistan skapas automatiskt
+              när onboardingen startas.
             </p>
           </div>
 
@@ -80,20 +88,20 @@ export function NewOnboardingForm() {
               <Input
                 id="firstName"
                 name="firstName"
-                placeholder="Anders"
-                defaultValue="Anders"
+                placeholder="Förnamn"
                 required
                 disabled={loading}
+                autoComplete="given-name"
               />
             </Field>
             <Field label="Efternamn" htmlFor="lastName">
               <Input
                 id="lastName"
                 name="lastName"
-                placeholder="Svensson"
-                defaultValue="Svensson"
+                placeholder="Efternamn"
                 required
                 disabled={loading}
+                autoComplete="family-name"
               />
             </Field>
           </div>
@@ -104,7 +112,7 @@ export function NewOnboardingForm() {
                 id="startDate"
                 name="startDate"
                 type="date"
-                defaultValue="2026-06-01"
+                defaultValue={defaultStartDate}
                 required
                 disabled={loading}
               />
@@ -114,10 +122,10 @@ export function NewOnboardingForm() {
               <Input
                 id="position"
                 name="position"
-                placeholder="Elektriker"
-                defaultValue="Elektriker"
+                placeholder="Befattning"
                 required
                 disabled={loading}
+                autoComplete="organization-title"
               />
             </Field>
           </div>

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ignore the legacy duplicate app copy already excluded from TypeScript.
+    "onboarding-app/**",
   ]),
 ]);
 
