@@ -180,6 +180,7 @@ export async function createOnboarding(input: CreateOnboardingInput) {
     );
 
   if (checklistError) {
+    await supabase.from("onboarding").delete().eq("id", data.id);
     throw toAppError(checklistError, "Could not create checklist items.");
   }
 

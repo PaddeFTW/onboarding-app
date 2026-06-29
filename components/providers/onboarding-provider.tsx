@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -42,6 +43,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mutationVersionRef = useRef(0);
 
   const { ongoing, completed } = useMemo(
     () => sortOnboardings(onboardings),
@@ -49,11 +51,16 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   );
 
   async function refreshOnboardings() {
+    const refreshVersion = mutationVersionRef.current;
+
     try {
       setIsLoading(true);
       setError(null);
       const data = await listOnboardings();
-      setOnboardings(data);
+
+      if (refreshVersion === mutationVersionRef.current) {
+        setOnboardings(data);
+      }
     } catch (refreshError) {
       setError(
         refreshError instanceof Error
@@ -66,7 +73,37 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    void refreshOnboardings();
+    let active = true;
+    const refreshVersion = mutationVersionRef.current;
+
+    async function loadInitialOnboardings() {
+      try {
+        const data = await listOnboardings();
+
+        if (active && refreshVersion === mutationVersionRef.current) {
+          setOnboardings(data);
+          setError(null);
+        }
+      } catch (refreshError) {
+        if (active) {
+          setError(
+            refreshError instanceof Error
+              ? refreshError.message
+              : "Could not load onboardings."
+          );
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadInitialOnboardings();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const value = useMemo<OnboardingContextValue>(
@@ -79,6 +116,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       createOnboarding: async (input) => {
         try {
           const onboarding = await createOnboarding(input);
+          mutationVersionRef.current += 1;
           setOnboardings((current) => [onboarding, ...current]);
           setError(null);
           return onboarding.id;
@@ -99,6 +137,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
             completed
           );
 
+          mutationVersionRef.current += 1;
           setOnboardings((current) =>
             current.map((item) =>
               item.id === updatedOnboarding.id ? updatedOnboarding : item
