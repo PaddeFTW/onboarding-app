@@ -1,26 +1,202 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ */
+/*  DESIGN TOKENS                                                      */
+/*  Light, airy, premium. Indigo/violet accent. Layered shadows.      */
+/* ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Border radius system (16px base) */
+  --radius: 1rem;
+
+  /* Surfaces: off-white background, white cards — creates depth */
+  --background: #fafafa;
+  --foreground: #18181b;
+
+  --card: #ffffff;
+  --card-foreground: #18181b;
+
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+
+  /* Brand — Indigo / Violet */
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --primary-light: #eef2ff; /* very subtle indigo tint */
+
+  --secondary: #f4f4f6;
+  --secondary-foreground: #27272a;
+
+  --muted: #f4f4f6;
+  /* Slightly darker than before — better contrast on #fafafa (5.2:1) */
+  --muted-foreground: #64646c;
+
+  --accent: #f0efff; /* subtle indigo tint for hover */
+  --accent-foreground: #4338ca;
+
+  /* Status */
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --success-subtle: #ecfdf5;
+
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+  --warning-subtle: #fffbeb;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --destructive-subtle: #fef2f2;
+
+  /* Lines & focus */
+  --border: #e8e9ec; /* slightly more defined than before */
+  --input: #e4e4e7;
+  --ring: #6366f1;
+
+  /* ---------------------------------------------------------------- */
+  /*  SHADOW SYSTEM — Layered, soft depth                             */
+  /* ---------------------------------------------------------------- */
+  --shadow-soft-xs: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-soft-sm: 0 1px 3px rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-soft-md: 0 4px 12px -2px rgb(0 0 0 / 0.09), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-soft-lg: 0 16px 32px -8px rgb(0 0 0 / 0.13), 0 6px 12px -4px rgb(0 0 0 / 0.07);
+  --shadow-soft-xl: 0 28px 56px -14px rgb(0 0 0 / 0.16), 0 12px 24px -8px rgb(0 0 0 / 0.09);
 }
 
+/* ------------------------------------------------------------------ */
+/*  TAILWIND THEME MAPPING                                             */
+/* ------------------------------------------------------------------ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-background:        var(--background);
+  --color-foreground:        var(--foreground);
+  --color-card:              var(--card);
+  --color-card-foreground:   var(--card-foreground);
+  --color-popover:           var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary:           var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-light:     var(--primary-light);
+  --color-secondary:         var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:             var(--muted);
+  --color-muted-foreground:  var(--muted-foreground);
+  --color-accent:            var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success:           var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle:    var(--success-subtle);
+  --color-warning:           var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle:    var(--warning-subtle);
+  --color-destructive:       var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-border:            var(--border);
+  --color-input:             var(--input);
+  --color-ring:              var(--ring);
+
+  /* Radius scale */
+  --radius-sm:  calc(var(--radius) - 4px); /* 12px */
+  --radius-md:  calc(var(--radius) - 2px); /* 14px */
+  --radius-lg:  var(--radius);              /* 16px */
+  --radius-xl:  calc(var(--radius) + 4px); /* 20px */
+  --radius-2xl: calc(var(--radius) + 8px); /* 24px */
+
+  /* Shadow utilities */
+  --shadow-soft-xs: var(--shadow-soft-xs);
+  --shadow-soft-sm: var(--shadow-soft-sm);
+  --shadow-soft-md: var(--shadow-soft-md);
+  --shadow-soft-lg: var(--shadow-soft-lg);
+  --shadow-soft-xl: var(--shadow-soft-xl);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ------------------------------------------------------------------ */
+/*  ANIMATION KEYFRAMES                                                */
+/* ------------------------------------------------------------------ */
+
+/* Subtle upward fade — 8px is tasteful, not theatrical */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Spring-bounce for celebratory elements (checkmark, modals) */
+@keyframes scale-in-bounce {
+  0%   { opacity: 0; transform: scale(0.72); }
+  55%  {             transform: scale(1.04); }
+  75%  {             transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1);    }
+}
+
+/* Pulsing ring for completion state — success glow */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(16, 185, 129, 0.45); }
+  65%  { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0);    }
+  100% { box-shadow: 0 0 0 0   rgba(16, 185, 129, 0);     }
+}
+
+@layer utilities {
+  /* Expo-out easing (cubic-bezier(0.16, 1, 0.3, 1)) — snappy and premium */
+  .animate-fade-up {
+    animation: fade-up 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-scale-in {
+    animation: scale-in-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  /* Infinite pulsing ring — starts after scale-in finishes */
+  .animate-pulse-ring {
+    animation: pulse-ring 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    animation-delay: 0.55s;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ------------------------------------------------------------------ */
+/*  BASE LAYER                                                         */
+/* ------------------------------------------------------------------ */
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklab, var(--ring) 40%, transparent);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Prevents layout shift on scrollbar appearance */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    letter-spacing: -0.011em;
+  }
+
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    letter-spacing: -0.025em; /* Tighter — more premium */
+    text-wrap: balance;
+  }
+
+  /* Smooth scrolling everywhere */
+  * {
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
 }
