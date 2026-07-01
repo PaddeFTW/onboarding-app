@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Download,
+  ExternalLink,
   FileText,
   Plus,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   getOnboardingStatus,
   type OnboardingRecord,
 } from "@/lib/onboarding";
+import { getOnboardingDocumentHref } from "@/lib/document-links";
 import { cn } from "@/lib/utils";
 
 import { useOnboardingStore } from "@/components/providers/onboarding-provider";
@@ -323,18 +325,41 @@ export function ChecklistView({ id }: { id: string }) {
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
                       Dokument
                     </p>
-                    {openItem.documents.map((doc) => (
-                      <div
-                        key={doc.name}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-3 rounded-2xl border border-border/90 bg-secondary/40 px-4 py-3 transition-all duration-200 hover:-translate-y-px hover:bg-accent/40 hover:shadow-soft-xs"
-                        )}
-                      >
-                        <FileText className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 truncate text-sm">{doc.name}</span>
-                        <Download className="size-3.5 shrink-0 text-muted-foreground/60" />
-                      </div>
-                    ))}
+                    {openItem.documents.map((doc) => {
+                      const href = getOnboardingDocumentHref(doc.sourcePath);
+
+                      if (!href) {
+                        return (
+                          <div
+                            key={doc.name}
+                            className={cn(
+                              "flex items-center gap-3 rounded-2xl border border-border/90 bg-secondary/40 px-4 py-3"
+                            )}
+                          >
+                            <FileText className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="flex-1 truncate text-sm">{doc.name}</span>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <Link
+                          key={doc.name}
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={cn(
+                            "flex items-center gap-3 rounded-2xl border border-border/90 bg-secondary/40 px-4 py-3",
+                            "transition-all duration-200 hover:-translate-y-px hover:bg-accent/40 hover:shadow-soft-xs",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                          )}
+                        >
+                          <FileText className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="flex-1 truncate text-sm">{doc.name}</span>
+                          <ExternalLink className="size-3.5 shrink-0 text-muted-foreground/60" />
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
 
