@@ -10,6 +10,7 @@ export interface ExportIncludeOptions {
 }
 
 interface ExportDocument {
+  baseFileName: string;
   fileName: string;
   html: string;
   text: string;
@@ -199,9 +200,11 @@ export function buildOnboardingExport(
       )}</p></section>`
   );
 
-  const fileName = `onboarding-${employeeName.replaceAll(" ", "-").toLowerCase()}.txt`;
+  const baseFileName = `onboarding-${employeeName.replaceAll(" ", "-").toLowerCase()}`;
+  const fileName = `${baseFileName}.txt`;
 
   return {
+    baseFileName,
     title: `Onboarding-rapport – ${employeeName}`,
     fileName,
     text,

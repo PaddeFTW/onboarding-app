@@ -8,7 +8,6 @@ import {
   Printer,
   Copy,
   Download,
-  Cloud,
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -41,8 +40,8 @@ const FORMAT_OPTIONS = [
     id: "word",
     label: "Word",
     icon: FileOutput,
-    description: "Exportera till .docx",
-    action: "stub",
+    description: "Ladda ner Word-dokument",
+    action: "word",
   },
   {
     id: "email",
@@ -71,13 +70,6 @@ const FORMAT_OPTIONS = [
     icon: Download,
     description: "Ladda ner textfil",
     action: "download",
-  },
-  {
-    id: "onedrive",
-    label: "OneDrive",
-    icon: Cloud,
-    description: "Spara i OneDrive",
-    action: "stub",
   },
 ] as const;
 
@@ -133,54 +125,73 @@ export function ExportDialog({
     printWindow.print();
   }
 
+  function downloadBlob(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleExport() {
     setExporting(true);
-    await new Promise((r) => setTimeout(r, 600));
 
-    const format = FORMAT_OPTIONS.find((f) => f.id === selectedFormat);
-    if (!format) {
-      setExporting(false);
-      return;
-    }
+    try {
+      await new Promise((r) => setTimeout(r, 300));
 
-    const exportDocument = buildOnboardingExport(onboarding, include);
-
-    switch (format.action) {
-      case "print":
-        openPrintableDocument(exportDocument.html, exportDocument.title);
-        toast.success("Öppnar utskriftsdialog");
-        break;
-      case "email":
-        window.location.href = `mailto:?subject=${encodeURIComponent(
-          exportDocument.title
-        )}&body=${encodeURIComponent(exportDocument.text)}`;
-        break;
-      case "copy":
-        await navigator.clipboard.writeText(exportDocument.text);
-        toast.success("Kopierat till urklipp");
-        break;
-      case "download": {
-        const blob = new Blob([exportDocument.text], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = exportDocument.fileName;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Fil nedladdad");
-        break;
+      const format = FORMAT_OPTIONS.find((f) => f.id === selectedFormat);
+      if (!format) {
+        throw new Error("Kunde inte hitta valt exportformat.");
       }
-      case "pdf":
-        openPrintableDocument(exportDocument.html, exportDocument.title);
-        toast.success("Öppnar utskriftsdialog");
-        break;
-      case "stub":
-        toast.info(`${format.label} – Kommer snart`);
-        break;
-    }
 
-    setExporting(false);
-    onOpenChange(false);
+      const exportDocument = buildOnboardingExport(onboarding, include);
+
+      switch (format.action) {
+        case "print":
+          openPrintableDocument(exportDocument.html, exportDocument.title);
+          toast.success("Öppnar utskriftsdialog");
+          break;
+        case "email":
+          window.location.href = `mailto:?subject=${encodeURIComponent(
+            exportDocument.title
+          )}&body=${encodeURIComponent(
+            `Hej,\n\nHär kommer onboardingrapporten.\n\n${exportDocument.text}`
+          )}`;
+          toast.success("Öppnar e-postklient");
+          break;
+        case "copy":
+          await navigator.clipboard.writeText(exportDocument.text);
+          toast.success("Kopierat till urklipp");
+          break;
+        case "download": {
+          const blob = new Blob([exportDocument.text], { type: "text/plain;charset=utf-8" });
+          downloadBlob(blob, exportDocument.fileName);
+          toast.success("Fil nedladdad");
+          break;
+        }
+        case "word": {
+          const blob = new Blob([exportDocument.html], {
+            type: "application/msword;charset=utf-8",
+          });
+          downloadBlob(blob, `${exportDocument.baseFileName}.doc`);
+          toast.success("Word-dokument nedladdat");
+          break;
+        }
+        case "pdf":
+          openPrintableDocument(exportDocument.html, exportDocument.title);
+          toast.success("Öppnar PDF-vy för utskrift eller spara som PDF");
+          break;
+      }
+
+      onOpenChange(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Exporten kunde inte genomföras.";
+      toast.error(message);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
