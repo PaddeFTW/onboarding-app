@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { buildOnboardingExport, type ExportIncludeOptions } from "@/lib/export";
+import type { OnboardingRecord } from "@/lib/onboarding";
 import {
   Dialog,
   DialogContent,
@@ -86,29 +88,49 @@ const INCLUDE_OPTIONS = [
   { id: "signatures", label: "Signaturer", defaultChecked: true },
   { id: "attachments", label: "Bilagor", defaultChecked: false },
   { id: "comments", label: "Kommentarer", defaultChecked: false },
-];
+] as const;
+
+const DEFAULT_INCLUDE_OPTIONS: ExportIncludeOptions = {
+  checklist: true,
+  policy: true,
+  "work-env": true,
+  signatures: true,
+  attachments: false,
+  comments: false,
+};
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  employeeName?: string;
+  onboarding: OnboardingRecord;
 }
 
 export function ExportDialog({
   open,
   onOpenChange,
-  employeeName = "medarbetaren",
+  onboarding,
 }: ExportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<string>("pdf");
-  const [include, setInclude] = useState<Record<string, boolean>>(
-    Object.fromEntries(
-      INCLUDE_OPTIONS.map((o) => [o.id, o.defaultChecked])
-    )
-  );
+  const [include, setInclude] = useState<ExportIncludeOptions>(DEFAULT_INCLUDE_OPTIONS);
   const [exporting, setExporting] = useState(false);
 
-  function toggleInclude(id: string) {
+  function toggleInclude(id: keyof ExportIncludeOptions) {
     setInclude((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function openPrintableDocument(html: string, title: string) {
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+
+    if (!printWindow) {
+      throw new Error("Kunde inte öppna utskriftsvyn.");
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.document.title = title;
+    printWindow.focus();
+    printWindow.print();
   }
 
   async function handleExport() {
@@ -116,37 +138,40 @@ export function ExportDialog({
     await new Promise((r) => setTimeout(r, 600));
 
     const format = FORMAT_OPTIONS.find((f) => f.id === selectedFormat);
-    if (!format) return;
+    if (!format) {
+      setExporting(false);
+      return;
+    }
+
+    const exportDocument = buildOnboardingExport(onboarding, include);
 
     switch (format.action) {
       case "print":
-        window.print();
+        openPrintableDocument(exportDocument.html, exportDocument.title);
+        toast.success("Öppnar utskriftsdialog");
         break;
       case "email":
-        window.location.href = `mailto:?subject=Onboarding – ${employeeName}&body=Se bifogad onboarding-rapport.`;
+        window.location.href = `mailto:?subject=${encodeURIComponent(
+          exportDocument.title
+        )}&body=${encodeURIComponent(exportDocument.text)}`;
         break;
       case "copy":
-        await navigator.clipboard.writeText(
-          `Onboarding-rapport för ${employeeName}\nDatum: ${new Date().toLocaleDateString("sv-SE")}\n\nAllt genomfört.`
-        );
+        await navigator.clipboard.writeText(exportDocument.text);
         toast.success("Kopierat till urklipp");
         break;
       case "download": {
-        const blob = new Blob(
-          [`Onboarding-rapport – ${employeeName}\n${new Date().toLocaleDateString("sv-SE")}`],
-          { type: "text/plain" }
-        );
+        const blob = new Blob([exportDocument.text], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `onboarding-${employeeName.replace(" ", "-").toLowerCase()}.txt`;
+        a.download = exportDocument.fileName;
         a.click();
         URL.revokeObjectURL(url);
         toast.success("Fil nedladdad");
         break;
       }
       case "pdf":
-        window.print();
+        openPrintableDocument(exportDocument.html, exportDocument.title);
         toast.success("Öppnar utskriftsdialog");
         break;
       case "stub":

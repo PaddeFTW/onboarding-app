@@ -16,6 +16,8 @@ import {
 
 import {
   calcProgress,
+  type ChecklistItem,
+  type ChecklistItemDetailData,
   countCompleted,
   formatDate,
   getInitials,
@@ -35,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -49,10 +52,139 @@ import {
 } from "@/components/ui/sheet";
 import { ExportDialog } from "@/components/onboarding/ExportDialog";
 
+const RECEIPTS_FIELDS = [
+  { key: "receiptDate", label: "Datum", placeholder: "2026-07-01", multiline: false },
+  {
+    key: "keyReceipt",
+    label: "Nycklar",
+    placeholder: "Antal, märkning eller annan viktig information",
+    multiline: true,
+  },
+  {
+    key: "mobileReceipt",
+    label: "Mobil",
+    placeholder: "Typ av mobiltelefon, mobilnummer eller övrig information",
+    multiline: true,
+  },
+  {
+    key: "toolReceipt",
+    label: "Verktyg",
+    placeholder: "Verktyg, antal eller märkning",
+    multiline: true,
+  },
+  {
+    key: "clothingReceipt",
+    label: "Arbetskläder och skyddsutrustning",
+    placeholder: "Vilka kläder eller skydd som har lämnats ut",
+    multiline: true,
+  },
+  {
+    key: "employeeSignature",
+    label: "Namnteckning (anställd)",
+    placeholder: "Anställdes namn",
+    multiline: false,
+  },
+  {
+    key: "companySignature",
+    label: "Namnteckning (företag)",
+    placeholder: "Ansvarig representant",
+    multiline: false,
+  },
+] as const;
+
+const FOLLOW_UP_FIELDS = [
+  {
+    key: "confirmationDate",
+    label: "Datum för bekräftelse",
+    placeholder: "2026-07-01",
+    multiline: false,
+  },
+  {
+    key: "responsiblePerson",
+    label: "Ansvarig",
+    placeholder: "Ansvarig chef eller handledare",
+    multiline: false,
+  },
+  {
+    key: "confirmationSummary",
+    label: "Bekräftelse på genomgång",
+    placeholder: "Vad har gåtts igenom och bekräftats?",
+    multiline: true,
+  },
+  {
+    key: "wellBeing",
+    label: "Trivsel och arbetssituation",
+    placeholder: "Hur fungerar arbetssituation, arbetstider och trivsel?",
+    multiline: true,
+  },
+  {
+    key: "workEnvironmentNotes",
+    label: "Arbetsmiljö",
+    placeholder: "Anteckningar om fysisk eller social arbetsmiljö",
+    multiline: true,
+  },
+  {
+    key: "improvementSuggestions",
+    label: "Förbättringsförslag",
+    placeholder: "Vad kan förbättras i introduktionen eller arbetssituationen?",
+    multiline: true,
+  },
+] as const;
+
+function getInitialDetailData(item: ChecklistItem | null): ChecklistItemDetailData {
+  return item?.detailData ? { ...item.detailData } : {};
+}
+
+function DetailFields({
+  fields,
+  values,
+  onChange,
+}: {
+  fields: ReadonlyArray<{
+    key: string;
+    label: string;
+    placeholder: string;
+    multiline: boolean;
+  }>;
+  values: ChecklistItemDetailData;
+  onChange: (key: string, value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      {fields.map((field) => (
+        <div key={field.key} className="flex flex-col gap-2">
+          <Label
+            htmlFor={field.key}
+            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70"
+          >
+            {field.label}
+          </Label>
+          {field.multiline ? (
+            <Textarea
+              id={field.key}
+              value={values[field.key] ?? ""}
+              onChange={(event) => onChange(field.key, event.target.value)}
+              placeholder={field.placeholder}
+              className="min-h-24 resize-none"
+            />
+          ) : (
+            <Input
+              id={field.key}
+              value={values[field.key] ?? ""}
+              onChange={(event) => onChange(field.key, event.target.value)}
+              placeholder={field.placeholder}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ChecklistView({ id }: { id: string }) {
   const {
     getOnboarding,
-    setChecklistItemCompleted,
+    saveChecklistItem,
     isLoading,
     error,
     refreshOnboardings,
@@ -60,6 +192,8 @@ export function ChecklistView({ id }: { id: string }) {
   const onboarding = getOnboarding(id);
   const [openItemId, setOpenItemId] = useState<string | null>(null);
   const [sheetChecked, setSheetChecked] = useState(false);
+  const [sheetComment, setSheetComment] = useState("");
+  const [sheetDetailData, setSheetDetailData] = useState<ChecklistItemDetailData>({});
   const [exportOpen, setExportOpen] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -122,6 +256,8 @@ export function ChecklistView({ id }: { id: string }) {
     setOpenItemId(itemId);
     const item = currentOnboarding.checklist.find((entry) => entry.id === itemId);
     setSheetChecked(Boolean(item?.completedAt));
+    setSheetComment(item?.comment ?? "");
+    setSheetDetailData(getInitialDetailData(item ?? null));
   }
 
   async function handleSaveItem() {
@@ -129,10 +265,14 @@ export function ChecklistView({ id }: { id: string }) {
 
     try {
       setIsSaving(true);
-      await setChecklistItemCompleted(
+      await saveChecklistItem(
         currentOnboarding.id,
         openItemId,
-        sheetChecked
+        {
+          comment: sheetComment,
+          completed: sheetChecked,
+          detailData: sheetDetailData,
+        }
       );
       setOpenItemId(null);
     } catch (saveError) {
@@ -144,6 +284,13 @@ export function ChecklistView({ id }: { id: string }) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function handleDetailDataChange(key: string, value: string) {
+    setSheetDetailData((current) => ({
+      ...current,
+      [key]: value,
+    }));
   }
 
   const fullName = `${currentOnboarding.firstName} ${currentOnboarding.lastName}`;
@@ -363,6 +510,22 @@ export function ChecklistView({ id }: { id: string }) {
                   </div>
                 )}
 
+                {openItem.templateKey === "receipts" && (
+                  <DetailFields
+                    fields={RECEIPTS_FIELDS}
+                    values={sheetDetailData}
+                    onChange={handleDetailDataChange}
+                  />
+                )}
+
+                {openItem.templateKey === "follow-up" && (
+                  <DetailFields
+                    fields={FOLLOW_UP_FIELDS}
+                    values={sheetDetailData}
+                    onChange={handleDetailDataChange}
+                  />
+                )}
+
                 <div className="flex flex-col gap-2">
                   <Label
                     htmlFor="comment"
@@ -372,6 +535,8 @@ export function ChecklistView({ id }: { id: string }) {
                   </Label>
                   <Textarea
                     id="comment"
+                    value={sheetComment}
+                    onChange={(event) => setSheetComment(event.target.value)}
                     placeholder="Lägg till en kommentar om genomgången…"
                     className="min-h-28 resize-none"
                   />
@@ -425,7 +590,7 @@ export function ChecklistView({ id }: { id: string }) {
       <ExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        employeeName={fullName}
+        onboarding={currentOnboarding}
       />
     </PageContainer>
   );
@@ -535,7 +700,7 @@ function CompletionView({
       <ExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        employeeName={fullName}
+        onboarding={onboarding}
       />
     </PageContainer>
   );

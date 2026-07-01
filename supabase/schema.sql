@@ -20,6 +20,8 @@ create table if not exists public.checklist_items (
   description text not null,
   info text not null,
   documents jsonb not null default '[]'::jsonb,
+  comment text,
+  detail_data jsonb not null default '{}'::jsonb,
   completed_at timestamptz
 );
 

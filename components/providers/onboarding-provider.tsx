@@ -12,13 +12,14 @@ import {
 
 import {
   sortOnboardings,
+  type ChecklistItemDetailData,
   type CreateOnboardingInput,
   type OnboardingRecord,
 } from "@/lib/onboarding";
 import {
   createOnboarding,
   listOnboardings,
-  updateChecklistItemCompletion,
+  saveChecklistItem,
 } from "@/lib/supabase/onboarding-repository";
 
 interface OnboardingContextValue {
@@ -28,10 +29,14 @@ interface OnboardingContextValue {
   isLoading: boolean;
   error: string | null;
   createOnboarding: (input: CreateOnboardingInput) => Promise<string>;
-  setChecklistItemCompleted: (
+  saveChecklistItem: (
     onboardingId: string,
     itemId: string,
-    completed: boolean
+    input: {
+      comment: string;
+      completed: boolean;
+      detailData: ChecklistItemDetailData;
+    }
   ) => Promise<void>;
   getOnboarding: (id: string) => OnboardingRecord | undefined;
   refreshOnboardings: () => Promise<void>;
@@ -129,12 +134,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           throw new Error(message);
         }
       },
-      setChecklistItemCompleted: async (onboardingId, itemId, completed) => {
+      saveChecklistItem: async (onboardingId, itemId, input) => {
         try {
-          const updatedOnboarding = await updateChecklistItemCompletion(
+          const updatedOnboarding = await saveChecklistItem(
             onboardingId,
             itemId,
-            completed
+            input
           );
 
           mutationVersionRef.current += 1;
@@ -148,7 +153,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           const message =
             updateError instanceof Error
               ? updateError.message
-              : "Could not update checklist item.";
+              : "Could not save checklist item.";
           setError(message);
           throw new Error(message);
         }

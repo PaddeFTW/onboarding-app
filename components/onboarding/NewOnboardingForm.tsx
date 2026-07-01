@@ -9,28 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useOnboardingStore } from "@/components/providers/onboarding-provider";
-
-const MOCK_MANAGERS = [
-  "Maria Lindqvist",
-  "Erik Johansson",
-  "Anna Larsson",
-  "Peter Holm",
-  "Sara Nyström",
-];
 
 export function NewOnboardingForm() {
   const router = useRouter();
   const { createOnboarding } = useOnboardingStore();
   const [loading, setLoading] = useState(false);
-  const [manager, setManager] = useState("");
   const [error, setError] = useState<string | null>(null);
   const defaultStartDate = useMemo(
     () => new Date().toISOString().slice(0, 10),
@@ -43,11 +27,13 @@ export function NewOnboardingForm() {
     setError(null);
 
     try {
+      const formData = new FormData(e.currentTarget as HTMLFormElement);
+      const manager = String(formData.get("manager") ?? "").trim();
+
       if (!manager) {
-        throw new Error("Välj ansvarig chef.");
+        throw new Error("Ange ansvarig chef.");
       }
 
-      const formData = new FormData(e.currentTarget as HTMLFormElement);
       const onboardingId = await createOnboarding({
         firstName: String(formData.get("firstName") ?? ""),
         lastName: String(formData.get("lastName") ?? ""),
@@ -131,22 +117,14 @@ export function NewOnboardingForm() {
           </div>
 
           <Field label="Ansvarig chef" htmlFor="manager">
-            <Select
+            <Input
+              id="manager"
+              name="manager"
+              placeholder="Ansvarig chef"
+              required
               disabled={loading}
-              value={manager}
-              onValueChange={setManager}
-            >
-              <SelectTrigger id="manager">
-                <SelectValue placeholder="Välj ansvarig chef" />
-              </SelectTrigger>
-              <SelectContent>
-                {MOCK_MANAGERS.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              autoComplete="name"
+            />
           </Field>
 
           {error ? (

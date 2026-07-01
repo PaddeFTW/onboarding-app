@@ -1,3 +1,5 @@
+import { loadEnvConfig } from "@next/env";
+
 import {
   CHECKLIST_TEMPLATE,
   calcProgress,
@@ -8,7 +10,7 @@ import {
   createOnboarding,
   getOnboarding,
   listOnboardings,
-  updateChecklistItemCompletion,
+  saveChecklistItem,
 } from "../lib/supabase/onboarding-repository";
 
 function expect(condition: boolean, message: string) {
@@ -18,6 +20,8 @@ function expect(condition: boolean, message: string) {
 }
 
 async function main() {
+  loadEnvConfig(process.cwd());
+
   const stamp = Date.now();
   const expectedTitles = CHECKLIST_TEMPLATE.map((item) => item.title);
   const input = {
@@ -57,7 +61,11 @@ async function main() {
   };
 
   for (const item of createdReloaded.checklist.slice(0, 3)) {
-    await updateChecklistItemCompletion(created.id, item.id, true);
+    await saveChecklistItem(created.id, item.id, {
+      completed: true,
+      comment: "",
+      detailData: {},
+    });
   }
 
   const afterPartial = await getOnboarding(created.id);
@@ -68,8 +76,49 @@ async function main() {
     completedAt: afterPartial.completedAt,
   };
 
-  for (const item of afterPartial.checklist.slice(3)) {
-    await updateChecklistItemCompletion(created.id, item.id, true);
+  const receiptsItem = afterPartial.checklist.find(
+    (item) => item.templateKey === "receipts"
+  );
+  const followUpItem = afterPartial.checklist.find(
+    (item) => item.templateKey === "follow-up"
+  );
+
+  if (!receiptsItem || !followUpItem) {
+    throw new Error("Expected receipts and follow-up items to exist.");
+  }
+
+  await saveChecklistItem(created.id, receiptsItem.id, {
+    completed: true,
+    comment: "Nycklar och utrustning utlämnad.",
+    detailData: {
+      receiptDate: "2026-07-01",
+      keyReceipt: "1 huvudnyckel",
+      employeeSignature: "QA Smoke",
+      companySignature: "Chef Test",
+    },
+  });
+
+  await saveChecklistItem(created.id, followUpItem.id, {
+    completed: true,
+    comment: "Uppföljning planerad.",
+    detailData: {
+      confirmationDate: "2026-07-10",
+      responsiblePerson: "Chef Test",
+      confirmationSummary: "Introduktionen har bekräftats.",
+      wellBeing: "Bra start på arbetsplatsen.",
+      improvementSuggestions: "Inga förbättringsförslag just nu.",
+    },
+  });
+
+  for (const item of afterPartial.checklist.filter(
+    (entry) =>
+      !entry.completedAt && entry.id !== receiptsItem.id && entry.id !== followUpItem.id
+  )) {
+    await saveChecklistItem(created.id, item.id, {
+      completed: true,
+      comment: item.templateKey === "policies" ? "Policy genomgången." : "",
+      detailData: {},
+    });
   }
 
   const afterComplete = await getOnboarding(created.id);
@@ -95,6 +144,12 @@ async function main() {
     stillPresentAfterRefresh: afterList.some((item) => item.id === created.id),
     beforeCount: before.length,
     afterCount: afterList.length,
+    receiptsComment: afterComplete.checklist.find(
+      (item) => item.templateKey === "receipts"
+    )?.comment,
+    followUpResponsible: afterComplete.checklist.find(
+      (item) => item.templateKey === "follow-up"
+    )?.detailData.responsiblePerson,
   };
 
   console.log(

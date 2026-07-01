@@ -11,8 +11,16 @@ export interface ChecklistTemplateItem {
   documents: ChecklistDocument[];
 }
 
+export interface ChecklistItemDetailData {
+  [key: string]: string;
+}
+
 export interface ChecklistItem extends ChecklistTemplateItem {
+  id: string;
+  templateKey: string;
   completedAt: string | null;
+  comment: string;
+  detailData: ChecklistItemDetailData;
 }
 
 export interface OnboardingRecord {

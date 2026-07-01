@@ -4,6 +4,7 @@ import {
   CHECKLIST_TEMPLATE,
   calcProgress,
   type ChecklistDocument,
+  type ChecklistItemDetailData,
   type ChecklistItem,
   type CreateOnboardingInput,
   type OnboardingRecord,
@@ -30,6 +31,8 @@ interface ChecklistItemRow {
   description: string;
   info: string;
   documents: ChecklistDocument[] | null;
+  comment: string | null;
+  detail_data: ChecklistItemDetailData | null;
   completed_at: string | null;
 }
 
@@ -40,10 +43,14 @@ function toAppError(error: PostgrestError | Error, fallback: string) {
 function mapChecklistItem(row: ChecklistItemRow): ChecklistItem {
   return {
     id: row.id,
+    templateKey: row.template_key,
     title: row.title,
     description: row.description,
     info: row.info,
     documents: Array.isArray(row.documents) ? row.documents : [],
+    comment: row.comment ?? "",
+    detailData:
+      row.detail_data && typeof row.detail_data === "object" ? row.detail_data : {},
     completedAt: row.completed_at,
   };
 }
@@ -73,7 +80,7 @@ async function fetchChecklistRows(onboardingId?: string) {
   let query = supabase
     .from("checklist_items")
     .select(
-      "id,onboarding_id,template_key,sort_order,title,description,info,documents,completed_at"
+      "id,onboarding_id,template_key,sort_order,title,description,info,documents,comment,detail_data,completed_at"
     )
     .order("sort_order", { ascending: true });
 
@@ -169,6 +176,8 @@ export async function createOnboarding(input: CreateOnboardingInput) {
     description: item.description,
     info: item.info,
     documents: item.documents,
+    comment: null,
+    detail_data: {},
     completed_at: null,
   }));
 
@@ -176,7 +185,7 @@ export async function createOnboarding(input: CreateOnboardingInput) {
     .from("checklist_items")
     .insert(checklistRows)
     .select(
-      "id,onboarding_id,template_key,sort_order,title,description,info,documents,completed_at"
+      "id,onboarding_id,template_key,sort_order,title,description,info,documents,comment,detail_data,completed_at"
     );
 
   if (checklistError) {
@@ -196,17 +205,27 @@ export async function getOnboarding(id: string) {
   return mapOnboardingRecord(onboarding, checklist);
 }
 
-export async function updateChecklistItemCompletion(
+export interface SaveChecklistItemInput {
+  comment: string;
+  completed: boolean;
+  detailData: ChecklistItemDetailData;
+}
+
+export async function saveChecklistItem(
   onboardingId: string,
   itemId: string,
-  completed: boolean
+  input: SaveChecklistItemInput
 ) {
   const supabase = getSupabaseBrowserClient();
-  const completedAt = completed ? new Date().toISOString() : null;
+  const completedAt = input.completed ? new Date().toISOString() : null;
 
   const { error } = await supabase
     .from("checklist_items")
-    .update({ completed_at: completedAt })
+    .update({
+      completed_at: completedAt,
+      comment: input.comment.trim() || null,
+      detail_data: input.detailData,
+    })
     .eq("id", itemId)
     .eq("onboarding_id", onboardingId);
 
