@@ -1,4 +1,5 @@
 import {
+  CHECKLIST_TEMPLATE,
   calcProgress,
   countCompleted,
   getOnboardingStatus,
@@ -10,8 +11,15 @@ import {
   updateChecklistItemCompletion,
 } from "../lib/supabase/onboarding-repository";
 
+function expect(condition: boolean, message: string) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
 async function main() {
   const stamp = Date.now();
+  const expectedTitles = CHECKLIST_TEMPLATE.map((item) => item.title);
   const input = {
     firstName: "QA",
     lastName: `Smoke-${stamp}`,
@@ -21,8 +29,25 @@ async function main() {
   };
 
   const before = await listOnboardings();
+  expect(
+    before.every((item) => item.checklist.length === CHECKLIST_TEMPLATE.length),
+    "Expected all existing onboardings to use the 12-chapter checklist."
+  );
+  expect(
+    before.every(
+      (item) =>
+        JSON.stringify(item.checklist.map((entry) => entry.title)) ===
+        JSON.stringify(expectedTitles)
+    ),
+    "Expected all existing onboardings to follow the canonical checklist order."
+  );
   const created = await createOnboarding(input);
   const createdReloaded = await getOnboarding(created.id);
+  expect(
+    JSON.stringify(createdReloaded.checklist.map((item) => item.title)) ===
+      JSON.stringify(expectedTitles),
+    "New onboarding did not get the canonical 12-chapter checklist."
+  );
 
   const initialChecks = {
     checklistCount: createdReloaded.checklist.length,
@@ -49,6 +74,18 @@ async function main() {
 
   const afterComplete = await getOnboarding(created.id);
   const afterList = await listOnboardings();
+  expect(
+    afterList.every((item) => item.checklist.length === CHECKLIST_TEMPLATE.length),
+    "Expected all onboardings to still use the 12-chapter checklist after mutations."
+  );
+  expect(
+    afterList.every(
+      (item) =>
+        JSON.stringify(item.checklist.map((entry) => entry.title)) ===
+        JSON.stringify(expectedTitles)
+    ),
+    "Expected checklist order to remain canonical after mutations."
+  );
 
   const completedChecks = {
     progress: calcProgress(afterComplete.checklist),
