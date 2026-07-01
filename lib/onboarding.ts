@@ -1,5 +1,6 @@
 export interface ChecklistDocument {
   name: string;
+  sourcePath?: string;
 }
 
 export interface ChecklistTemplateItem {
@@ -36,93 +37,148 @@ export interface CreateOnboardingInput {
 
 export type OnboardingStatus = "none" | "ongoing" | "completed";
 
+function chapterDocument(name: string, sourcePath: string): ChecklistDocument {
+  return { name, sourcePath };
+}
+
 export const CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   {
-    id: "presentation",
-    title: "Presentation",
+    id: "introduction",
+    title: "Introduktion",
     description:
-      "Presentation av medarbetaren för teamet och relevanta avdelningar.",
-    info: "Vi presenterar dig för dina närmaste kollegor och visar dig hur organisationen är uppbyggd. Ta gärna med frågor om kulturen och vardagliga rutiner.",
-    documents: [],
+      "Planering, ansvar, förberedelser och kontroll inför varje ny introduktion.",
+    info: "Detta moment bygger på kapitel 1 i introduktionsunderlaget och säkerställer att introduktionen är förberedd, att ansvariga är utsedda och att rätt material finns klart innan första arbetsdagen.",
+    documents: [
+      chapterDocument("Introduktion", "docs/onboarding/01-introduktion.md"),
+    ],
   },
   {
-    id: "tour",
-    title: "Rundvandring",
+    id: "company-information",
+    title: "Företagsinformation",
     description:
-      "Genomgång av arbetsplatsen - lokaler, utrustning och gemensamma ytor.",
-    info: "Vi visar dig runt i hela byggnaden: ditt arbetsområde, fikarum, mötesrum, förråd och utrymningsvägar. Fråga gärna om det du är osäker på.",
-    documents: [],
+      "Historik, affärsidé, organisation och den nyanställdes roll i företaget.",
+    info: "Detta moment utgår från kapitel 2 och används för att förankra företagets bakgrund, affärsidé, organisation och ansvarsfördelning hos den nyanställde.",
+    documents: [
+      chapterDocument(
+        "Företagsinformation",
+        "docs/onboarding/02-foretagsinformation.md"
+      ),
+    ],
   },
   {
-    id: "work-env",
-    title: "Arbetsmiljöpolicy",
+    id: "administration",
+    title: "Arbetstid och administration",
     description:
-      "Genomgång av företagets policy för en god och säker arbetsmiljö.",
-    info: "Vår arbetsmiljöpolicy fastslår att alla medarbetare har rätt till en trygg och hälsosam arbetsplats. Vi arbetar systematiskt med förebyggande åtgärder och välkomnar alla synpunkter.",
-    documents: [{ name: "Arbetsmiljöpolicy 2026.pdf" }],
+      "Arbetstider, lön, ledigheter, tidrapportering och viktiga administrativa rutiner.",
+    info: "Detta moment bygger på kapitel 3 och samlar den information som den nyanställde behöver om arbetstid, rapportering, ersättningar, sjukfrånvaro och familjerelaterade ledigheter.",
+    documents: [
+      chapterDocument(
+        "Arbetstid och administration",
+        "docs/onboarding/03-administration.md"
+      ),
+    ],
   },
   {
-    id: "risks",
-    title: "Risker på arbetsplatsen",
+    id: "wellness",
+    title: "Friskvård",
     description:
-      "Identifiering och hantering av risker specifika för din arbetsroll.",
-    info: "Varje yrkesroll har sina specifika risker. Vi går igenom vad som är relevant för din tjänst, hur du skyddar dig och vad du gör om du observerar ett riskmoment.",
-    documents: [{ name: "Riskbedömning 2026.pdf" }],
+      "Företagshälsovård, vårdcentralsavtal och företagets friskvårdsförmåner.",
+    info: "Detta moment utgår från kapitel 4 och förklarar företagshälsovårdens roll, medicinska kontroller i arbetslivet och vilka friskvårdsförmåner som erbjuds.",
+    documents: [
+      chapterDocument("Friskvård", "docs/onboarding/04-friskvard.md"),
+    ],
   },
   {
-    id: "safety-rep",
-    title: "Skyddsombud",
+    id: "work-environment",
+    title: "Arbetsmiljö",
     description:
-      "Information om skyddsombudets roll och hur du kontaktar dem.",
-    info: "Skyddsombudet representerar alla medarbetare i arbetsmiljöfrågor och är din kanal om du upplever problem. Du har alltid rätt att kontakta skyddsombudet utan att din chef informeras.",
-    documents: [],
+      "Skyddsorganisation, krisberedskap, akuta rutiner och ordnings- och skyddsregler.",
+    info: "Detta moment bygger på kapitel 5 och samlar arbetsmiljöorganisation, nödnummer, agerande vid olyckor och brand samt de säkerhetsregler som gäller på arbetsplatsen.",
+    documents: [
+      chapterDocument("Arbetsmiljö", "docs/onboarding/05-arbetsmiljo.md"),
+    ],
   },
   {
-    id: "first-aid",
-    title: "Första hjälpen",
+    id: "improvement-work",
+    title: "Förbättringsverksamhet",
     description:
-      "Genomgång av var förstahjälpenutrustning finns och grundläggande HLR.",
-    info: "Vi visar var hjärtstartare och första hjälpen-kit finns på samtliga plan. Du får en genomgång av vad du ska göra vid en akutsituation och hur du larmar räddningstjänsten.",
-    documents: [{ name: "HLR-guide.pdf" }],
+      "Förbättringsförslag, utbildningsutvärdering och avvikelsehantering.",
+    info: "Detta moment utgår från kapitel 6 och beskriver hur medarbetare deltar i förbättringsarbete, lämnar förslag och rapporterar avvikelser.",
+    documents: [
+      chapterDocument(
+        "Förbättringsverksamhet",
+        "docs/onboarding/06-forbattringsarbete.md"
+      ),
+    ],
   },
   {
-    id: "fire",
-    title: "Brand och utrymning",
-    description: "Brandrutiner, utrymningsvägar och mötesplatser vid larm.",
-    info: "Lär dig identifiera brandlarm, hitta utrymningsvägar och din anvisade mötesplats utanför byggnaden. Vi går igenom brandsläckarens placering och grundläggande användning.",
-    documents: [{ name: "Utrymningsplan.pdf" }],
+    id: "union-questions",
+    title: "Fackliga frågor",
+    description:
+      "Facklig kontaktväg, avtal och information om fackets roll i verksamheten.",
+    info: "Detta moment bygger på kapitel 7 och används för att visa vem som representerar facket eller vart den nyanställde ska hänvisas om lokalt avtal saknas.",
+    documents: [
+      chapterDocument(
+        "Fackliga frågor",
+        "docs/onboarding/07-fackliga-fragor.md"
+      ),
+    ],
   },
   {
-    id: "substance",
-    title: "Alkohol- och drogpolicy",
+    id: "house-rules",
+    title: "Ordnings- och skötselregler",
     description:
-      "Företagets nolltoleranspolicy avseende alkohol och droger på arbetsplatsen.",
-    info: "Vår policy innebär nolltolerans mot alkohol och droger under arbetstid och på arbetsplatsen. Policyn gäller även vid representation och resor i tjänsten.",
-    documents: [{ name: "Alkohol- och drogpolicy.pdf" }],
+      "Källsortering, städning, ordning och praktiska regler i arbetsmiljön.",
+    info: "Detta moment bygger på kapitel 8 och omfattar de vardagliga regler som skapar ordning, trivsel och tydlighet i produktion, kontor och gemensamma utrymmen.",
+    documents: [
+      chapterDocument(
+        "Ordnings- och skötselregler",
+        "docs/onboarding/08-ordningsregler.md"
+      ),
+    ],
   },
   {
-    id: "it",
-    title: "IT och system",
+    id: "policies",
+    title: "Policy",
     description:
-      "Tillgång till IT-system, inloggningsuppgifter och säkerhetsregler.",
-    info: "Du får tillgång till de system som krävs för din roll. Vi går igenom lösenordspolicyn, hur du rapporterar IT-incidenter och vad som är tillåtet att installera på företagets enheter.",
-    documents: [],
+      "Arbetsmiljöpolicy samt alkohol- och drogpolicy som gäller i företaget.",
+    info: "Detta moment utgår från kapitel 9 och används för att göra företagets policys kända, förstådda och praktiskt förankrade hos den nyanställde.",
+    documents: [
+      chapterDocument("Policy", "docs/onboarding/09-policy.md"),
+    ],
   },
   {
-    id: "gdpr",
-    title: "GDPR",
+    id: "receipts",
+    title: "Kvittenser",
     description:
-      "Genomgång av dataskyddsregler och hur vi hanterar personuppgifter.",
-    info: "GDPR ställer krav på hur vi hanterar personuppgifter för kunder, leverantörer och kollegor. Vi går igenom vilka uppgifter du arbetar med, hur de lagras säkert och vad du gör om du misstänker ett dataintrång.",
-    documents: [{ name: "Integritetspolicy.pdf" }],
+      "Nycklar, mobil, verktyg, arbetskläder och personlig skyddsutrustning.",
+    info: "Detta moment bygger på kapitel 10 och samlar de kvittenser som behövs när företagets egendom lämnas ut till den nyanställde.",
+    documents: [
+      chapterDocument("Kvittenser", "docs/onboarding/10-kvittenser.md"),
+    ],
   },
   {
-    id: "questions",
-    title: "Frågor och avrundning",
+    id: "alarms",
+    title: "Larm",
     description:
-      "Utrymme för frågor och sammanfattning av onboarding-programmet.",
-    info: "Nu är det dags att sammanfatta vad vi gått igenom och ge dig möjlighet att ställa frågor - om allt från arbetsuppgifter och förmåner till semester och kommunikationskanaler.",
-    documents: [],
+      "Öppning, stängning, inbrottslarm och rutiner vid falskt eller utlöst larm.",
+    info: "Detta moment utgår från kapitel 11 och tydliggör hur lokaler larmas på och av, vad som gäller vid falsklarm och hur personalen ska agera om larmet går.",
+    documents: [
+      chapterDocument("Larm", "docs/onboarding/11-larm.md"),
+    ],
+  },
+  {
+    id: "follow-up",
+    title: "Bekräftelse och uppföljning",
+    description:
+      "Bekräftelse på genomförd introduktion samt stöd för uppföljningssamtal.",
+    info: "Detta moment bygger på kapitel 12 och används för att bekräfta vilka områden som har gåtts igenom samt för att följa upp trivsel, arbetsmiljö och introduktionsupplevelse.",
+    documents: [
+      chapterDocument(
+        "Bekräftelse och uppföljning",
+        "docs/onboarding/12-uppfoljning.md"
+      ),
+    ],
   },
 ];
 
