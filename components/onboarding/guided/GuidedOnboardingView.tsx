@@ -17,6 +17,7 @@ import {
   calcGuidedProgress,
   countCompletedVisibleSteps,
   getCurrentStepIndex,
+  getIncompleteRequiredSteps,
   getNextVisibleStepId,
   getPreviousVisibleStepId,
   getStepOverviewStatus,
@@ -545,6 +546,7 @@ function StepOverviewSheet({
 function GuidedCompletionView({ instance }: { instance: OnboardingInstance }) {
   const visibleSteps = getVisibleSteps(instance);
   const completedCount = countCompletedVisibleSteps(instance);
+  const incompleteRequired = getIncompleteRequiredSteps(instance);
 
   return (
     <PageContainer className="relative flex min-h-[80vh] flex-col items-center justify-center gap-8 py-12 text-center sm:gap-10 sm:py-16">
@@ -607,19 +609,23 @@ function GuidedCompletionView({ instance }: { instance: OnboardingInstance }) {
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
             Sammanfattning
           </p>
-          <ul className="flex flex-col gap-2">
-            {visibleSteps
-              .filter((step) => step.status === "completed")
-              .map((step) => (
-                <li
-                  key={step.id}
-                  className="flex items-start gap-2 text-sm text-muted-foreground"
-                >
+          {incompleteRequired.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-muted-foreground">Kvarstående obligatoriska steg:</p>
+              {incompleteRequired.map((step) => (
+                <p key={step.id} className="text-sm font-medium text-foreground">{step.title}</p>
+              ))}
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {visibleSteps.filter((step) => step.status === "completed").map((step) => (
+                <li key={step.id} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <Check className="mt-0.5 size-4 shrink-0 text-success" />
                   <span>{step.title}</span>
                 </li>
               ))}
-          </ul>
+            </ul>
+          )}
         </Card>
 
         <Button size="lg" className="w-full sm:w-auto" asChild>

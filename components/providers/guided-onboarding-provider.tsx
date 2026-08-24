@@ -60,6 +60,30 @@ function emitChange() {
   listeners.forEach((listener) => listener());
 }
 
+function normalizeStoredInstance(value: unknown): OnboardingInstance | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<OnboardingInstance>;
+  if (typeof candidate.id !== "string" || !Array.isArray(candidate.steps)) {
+    return null;
+  }
+
+  return recomputeInstanceState({
+    ...candidate,
+    steps: candidate.steps.filter(
+      (step): step is OnboardingInstance["steps"][number] =>
+        Boolean(step && typeof step === "object" && typeof step.id === "string")
+    ).map((step) => ({
+      ...step,
+      response: step.response && typeof step.response === "object" ? step.response : {},
+      status: ["notStarted", "inProgress", "completed", "skipped"].includes(step.status)
+        ? step.status
+        : "notStarted",
+      completedAt: typeof step.completedAt === "string" ? step.completedAt : null,
+      completedBy: typeof step.completedBy === "string" ? step.completedBy : null,
+    })),
+  } as OnboardingInstance);
+}
+
 function loadInstancesFromStorage(): OnboardingInstance[] {
   if (typeof window === "undefined") {
     return EMPTY_SERVER_SNAPSHOT;
@@ -71,8 +95,13 @@ function loadInstancesFromStorage(): OnboardingInstance[] {
       return EMPTY_SERVER_SNAPSHOT;
     }
 
-    const parsed = JSON.parse(raw) as OnboardingInstance[];
-    return Array.isArray(parsed) ? parsed.map(recomputeInstanceState) : EMPTY_SERVER_SNAPSHOT;
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.flatMap((entry) => {
+          const normalized = normalizeStoredInstance(entry);
+          return normalized ? [normalized] : [];
+        })
+      : EMPTY_SERVER_SNAPSHOT;
   } catch {
     return EMPTY_SERVER_SNAPSHOT;
   }
