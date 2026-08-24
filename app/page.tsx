@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { ArrowRight, Plus, Sparkles } from "lucide-react";
 
 import { PageContainer } from "@/components/page-container";
 import { SectionHeader } from "@/components/section-header";
@@ -53,10 +53,52 @@ export default function HomePage() {
         </Button>
       </header>
 
+      {/* ── Guidat flöde — förhandsvisning ──────────────────────── */}
+      <section
+        className="relative animate-fade-up"
+        style={{ animationDelay: "0.06s" }}
+        aria-label="Guidat onboarding-flöde – förhandsvisning"
+      >
+        <Link
+          href="/onboarding/guided/demo-byggco"
+          className="group relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-primary-light p-5 transition-all duration-200 hover:border-primary/35 hover:shadow-[0_4px_20px_-4px_rgba(99,102,241,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6"
+        >
+          {/* Subtle background glow on hover */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.06] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+          />
+
+          <div className="relative flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
+              </div>
+              <span className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-primary/70">
+                Nytt — Förhandsvisning
+              </span>
+            </div>
+            <h2 className="text-[1.05rem] font-semibold tracking-tight text-foreground">
+              Prova det guidade flödet
+            </h2>
+            <p className="max-w-[42ch] text-sm leading-relaxed text-muted-foreground">
+              En steg-för-steg-upplevelse som leder deltagaren genom hela onboarding-programmet. Se hur det fungerar med en interaktiv demo.
+            </p>
+          </div>
+
+          <div className="relative flex shrink-0 items-center gap-2 self-start sm:self-auto">
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-soft-sm transition-all duration-150 group-hover:bg-primary/90 group-hover:shadow-soft-md">
+              Starta demo
+              <ArrowRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden="true" />
+            </span>
+          </div>
+        </Link>
+      </section>
+
       {/* ── Pågående ─────────────────────────────────────────────── */}
       <section
         className="relative flex flex-col gap-5 animate-fade-up"
-        style={{ animationDelay: "0.08s" }}
+        style={{ animationDelay: "0.12s" }}
       >
         <SectionHeader
           title="Pågående"
@@ -99,7 +141,7 @@ export default function HomePage() {
       {/* ── Slutförda ────────────────────────────────────────────── */}
       <section
         className="relative flex flex-col gap-5 animate-fade-up"
-        style={{ animationDelay: "0.14s" }}
+        style={{ animationDelay: "0.18s" }}
       >
         <SectionHeader
           title="Slutförda"
