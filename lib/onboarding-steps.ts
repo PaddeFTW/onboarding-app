@@ -353,11 +353,16 @@ export function calcGuidedProgress(instance: OnboardingInstance): number {
   return Math.round((completed / required.length) * 100);
 }
 
+export function getIncompleteRequiredSteps(
+  instance: OnboardingInstance
+): OnboardingStepInstance[] {
+  return getVisibleSteps(instance).filter(
+    (step) => step.required && step.status !== "completed"
+  );
+}
+
 export function canCompleteGuidedOnboarding(instance: OnboardingInstance): boolean {
-  const visible = getVisibleSteps(instance);
-  return visible
-    .filter((step) => step.required)
-    .every((step) => step.status === "completed");
+  return getIncompleteRequiredSteps(instance).length === 0;
 }
 
 export function getCurrentStepIndex(
