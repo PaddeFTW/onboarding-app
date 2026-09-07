@@ -44,6 +44,28 @@ interface OnboardingContextValue {
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
+function toUserFacingError(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    const message = error.message;
+
+    if (
+      message === "Failed to fetch" ||
+      message.includes("Failed to fetch") ||
+      message.includes("NetworkError")
+    ) {
+      return "Kunde inte nå databasen. Kontrollera att NEXT_PUBLIC_SUPABASE_URL och NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY är satta i Vercel och att projektet är tillgängligt.";
+    }
+
+    if (message.includes("Supabase is not configured")) {
+      return "Supabase är inte konfigurerat. Fyll i NEXT_PUBLIC_SUPABASE_URL och NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.";
+    }
+
+    return message;
+  }
+
+  return fallback;
+}
+
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,11 +89,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         setOnboardings(data);
       }
     } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Could not load onboardings."
-      );
+      setError(toUserFacingError(refreshError, "Kunde inte ladda onboardingar."));
     } finally {
       setIsLoading(false);
     }
@@ -92,9 +110,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       } catch (refreshError) {
         if (active) {
           setError(
-            refreshError instanceof Error
-              ? refreshError.message
-              : "Could not load onboardings."
+            toUserFacingError(refreshError, "Kunde inte ladda onboardingar.")
           );
         }
       } finally {
@@ -126,10 +142,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           setError(null);
           return onboarding.id;
         } catch (createError) {
-          const message =
-            createError instanceof Error
-              ? createError.message
-              : "Could not create onboarding.";
+          const message = toUserFacingError(
+            createError,
+            "Kunde inte skapa onboarding."
+          );
           setError(message);
           throw new Error(message);
         }
@@ -150,10 +166,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           );
           setError(null);
         } catch (updateError) {
-          const message =
-            updateError instanceof Error
-              ? updateError.message
-              : "Could not save checklist item.";
+          const message = toUserFacingError(
+            updateError,
+            "Kunde inte spara checklistpunkt."
+          );
           setError(message);
           throw new Error(message);
         }
