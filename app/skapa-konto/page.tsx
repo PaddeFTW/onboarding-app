@@ -1,18 +1,76 @@
-import Link from "next/link";
+"use client";
 
-export default function CreateAccountPage() {
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ensureCompany } from "@/lib/auth/ensure-company";
+import { createClient } from "@/lib/supabase/client";
+
+export default function SkapaKontoPage() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const fullName = String(form.get("full-name") ?? "").trim();
+    const companyName = String(form.get("company-name") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    if (password.length < 6) {
+      setError("Lösenordet ska ha minst 6 tecken.");
+      return;
+    }
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName, company_name: companyName },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (signUpError || !data.user) {
+      setLoading(false);
+      setError("Kontot kunde inte skapas. Använd en annan e-post eller logga in.");
+      return;
+    }
+    if (!data.session) {
+      setLoading(false);
+      setStatus("Kolla mejlen och klicka på länken. Företaget skapas när du kommer tillbaka.");
+      return;
+    }
+    try {
+      await ensureCompany(supabase, { fullName, companyName });
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : "Kontot skapades men företaget kunde inte sparas.");
+    }
+  }
+
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#f7f7f8] px-4">
-      <div className="w-full max-w-md text-center">
-        <p className="text-sm font-medium text-[#5b4dff]">Onboarding</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Skapa konto</h1>
-        <p className="mt-3 text-sm leading-relaxed text-neutral-500">
-          Kontot ska vara samma som i de andra apparna. Själva kontoskapandet väntar på den gemensamma inloggningen.
-        </p>
-        <Link href="/login" className="mt-6 inline-block text-sm font-semibold text-[#5b4dff]">
-          Tillbaka till logga in
-        </Link>
-      </div>
+    <main className="flex min-h-dvh items-center justify-center bg-[#f7f7f8] px-4 py-10">
+      <form className="w-full max-w-sm space-y-4 rounded-[28px] border border-neutral-200/80 bg-white p-5" onSubmit={handleSubmit}>
+        <h1 className="text-2xl font-semibold">Skapa konto</h1>
+        <p className="text-sm text-neutral-500">Du blir administratör för ditt företag.</p>
+        <div className="space-y-2"><Label htmlFor="full-name">Ditt namn</Label><Input className="h-12 rounded-full px-4" id="full-name" name="full-name" required /></div>
+        <div className="space-y-2"><Label htmlFor="company-name">Företag</Label><Input className="h-12 rounded-full px-4" id="company-name" name="company-name" required /></div>
+        <div className="space-y-2"><Label htmlFor="email">E-post</Label><Input autoComplete="email" className="h-12 rounded-full px-4" id="email" name="email" required type="email" /></div>
+        <div className="space-y-2"><Label htmlFor="password">Lösenord</Label><Input autoComplete="new-password" className="h-12 rounded-full px-4" id="password" minLength={6} name="password" required type="password" /></div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {status ? <p className="text-sm text-neutral-500">{status}</p> : null}
+        <Button className="h-12 w-full rounded-full bg-[#6d4dff]" disabled={loading} type="submit">{loading ? "Skapar…" : "Skapa konto"}</Button>
+        <p className="text-center text-sm"><Link className="font-semibold text-[#5b4dff]" href="/login">Tillbaka till inloggning</Link></p>
+      </form>
     </main>
   );
 }
