@@ -1,90 +1,49 @@
 # Project Status
 
-
-
 ## Aktuell status
 
+Version 1.0 är låst. Release Candidate 1 är verifierad.
 
+**Hybrid Foundation Del 1 och Del 2 är implementerade och ligger på `main`.**
+Produktion: https://onboarding-app-black.vercel.app
 
-Version 1.0 är låst.
-
-
-
-Release Candidate 1 är verifierad och redo för kundtest.
-
-
-
-Nästa version heter arbetsmässigt **Hybrid Foundation**. Första målet är den guidade kärnupplevelsen — ett steg i taget med progress, stegöversikt och lokal sparning.
-
-
-
-Permanent backend (autentisering, företag, Supabase-snapshots, historik) kommer i senare genomförandesteg enligt `docs/HYBRID_IMPLEMENTATION_PLAN.md`.
-
-
+Permanent backend för det guidade flödet (autentisering, företag, Supabase-snapshots, historik) kommer i Del 3–5 enligt `docs/HYBRID_IMPLEMENTATION_PLAN.md`.
 
 Ingen generell Quality WorX-plattform byggs.
 
+## Verifierat i produktion (2026-09-07)
 
+- `main` innehåller merge av PR #4 (`9955eddc`)
+- Guidat flöde `/onboarding/guided/demo-byggco` fungerar
+- Fyra stegtyper, progress, stegöversikt, nästa/tillbaka, villkorad PPE
+- Härdad localStorage-normalisering och kontroll av obligatoriska steg
+- Version 1.0-checklistan, export och dokumentvisare är oförändrade
 
-## Verifierat för Release Candidate 1
+## Känt gap i produktion
 
+Startsidans lista "Pågående" / "Slutförda" hämtas från Supabase. Om `NEXT_PUBLIC_SUPABASE_URL` eller `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` saknas eller blockeras visas ett lastfel. Det påverkar inte det guidade demot, som sparas i webbläsaren.
 
+## Hybrid Foundation — Del 1 (klar)
 
-- lint är godkänd
+- Guidat genomförandeflöde som förhandsvisning
+- Stegtyper: `information`, `confirmation`, `singleChoice`, `task`
+- Lokal sparning via `GuidedOnboardingProvider`
 
-- build är godkänd
+## Hybrid Foundation — Del 2 (klar)
 
-- smoke test är godkänt
+- Normalisering av sparad onboardingdata vid återupptagning
+- Gemensam kontroll för kvarstående obligatoriska steg (`getIncompleteRequiredSteps`)
+- Completion-/sammanfattningsvy och draft-hantering
+- Mergad till `main` via PR #4
 
-- Supabase-konfiguration fungerar
+## Nästa fokus
 
-- tolv PDF-dokument finns i `public/documents/`
-
-- exportdialogen är redo för kundtest
-
-- OneDrive ingår inte som exportalternativ
-
-- huvudbranch är `main`
-
-
-
-## Hybrid Foundation — Del 1 (pågående)
-
-
-
-Implementerat eller pågående:
-
-
-
-- dokumentation för hybridmodell, arkitektur och implementationsplan
-
-- guidat genomförandeflöde som förhandsvisning (`/onboarding/guided/demo-byggco`)
-
-- fyra stegtyper: `information`, `confirmation`, `singleChoice`, `task`
-
-- lokal sparning i webbläsaren via `GuidedOnboardingProvider`
-
-- befintlig checklista, startsida och export oförändrade
-
-
-
-## Viktigaste kommande fokus (efter Del 1)
-
-
-
-- stegöversikt och återupptagning (Del 2)
-
-- företagsmallar och mallversioner (Del 3)
-
-- autentisering, företag, roller, permanent lagring (Del 4)
-
-- dokument, export och kunskapsbank (Del 5)
-
-
+1. Säkra att Vercel har giltiga Supabase-nycklar så checklist-listan laddar
+2. Del 3 — företagsmallar och mallversioner
+3. Del 4 — autentisering, företag, roller, permanent lagring
+4. Del 5 — dokument, PDF-export och kunskapsbank
+5. Konsolidera Batch 01–03 till `ONBOARDING_STEPBANK_MASTER.md`
 
 ## Produktprincip
 
-
-
 Nästa version ska bygga permanent lagring, företagsisolering och versionssäkerhet under den befintliga prototypens enkla grundflöde. Appen ska inte bli ett stort HR-system.
-
