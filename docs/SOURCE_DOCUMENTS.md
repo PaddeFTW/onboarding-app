@@ -7,6 +7,7 @@ Originalfilerna ligger inte i repot.
 ## Koppling
 
 - Introduktionspärmen 2026 har samma tolv områden som Version 1.0-checklistan.
+- Onboarding-paket 2026 är en kort översikt: dag 1, vecka 1, uppföljning efter 3 månader. Den ersätter inte pärmen.
 - Policypaketet är tolv Word-mallar: kvalitet, miljö, arbetsmiljö, GDPR, verksamhet, IT, personal, alkohol och droger, diskriminering, fordon, brandskydd, CSR.
 - Skyddsrond, medarbetarsamtal och medarbetarenkät är blanketter för arbetsmiljöåret, inte första dagens flöde.
 - Lagefterlevnad hör till ledningssystemet, inte till nyanställdas introduktion.
