@@ -31,6 +31,7 @@ interface GuidedOnboardingContextValue {
   isHydrated: boolean;
   getInstance: (id: string) => OnboardingInstance | undefined;
   ensureDemoInstance: () => void;
+  addInstance: (instance: OnboardingInstance) => void;
   updateStepResponse: (
     instanceId: string,
     stepId: string,
@@ -69,6 +70,12 @@ function normalizeStoredInstance(value: unknown): OnboardingInstance | null {
 
   return recomputeInstanceState({
     ...candidate,
+    templateVersionId:
+      typeof candidate.templateVersionId === "string"
+        ? candidate.templateVersionId
+        : null,
+    templateLabel:
+      typeof candidate.templateLabel === "string" ? candidate.templateLabel : null,
     steps: candidate.steps.filter(
       (step): step is OnboardingInstance["steps"][number] =>
         Boolean(step && typeof step === "object" && typeof step.id === "string")
@@ -189,12 +196,21 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
     replaceGuidedInstances([demo, ...cachedSnapshot]);
   }, []);
 
+  const addInstance = useCallback((instance: OnboardingInstance) => {
+    const next = recomputeInstanceState(instance);
+    replaceGuidedInstances([
+      next,
+      ...cachedSnapshot.filter((existing) => existing.id !== next.id),
+    ]);
+  }, []);
+
   const value = useMemo<GuidedOnboardingContextValue>(
     () => ({
       instances,
       isHydrated,
       getInstance: (id) => instances.find((instance) => instance.id === id),
       ensureDemoInstance,
+      addInstance,
       updateStepResponse: (instanceId, stepId, response) => {
         updateGuidedInstance(instanceId, (instance) =>
           withUpdatedStep(instance, stepId, (step) => ({
@@ -239,7 +255,7 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
         ]);
       },
     }),
-    [ensureDemoInstance, instances, isHydrated]
+    [addInstance, ensureDemoInstance, instances, isHydrated]
   );
 
   return (
