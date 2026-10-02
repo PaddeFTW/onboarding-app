@@ -13,9 +13,7 @@ export async function updateSession(request: NextRequest) {
   const { url, key } = env();
   const supabase = createServerClient(url, key, {
     cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
+      getAll() { return request.cookies.getAll(); },
       setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         supabaseResponse = NextResponse.next({ request });
@@ -23,18 +21,9 @@ export async function updateSession(request: NextRequest) {
       },
     },
   });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic =
-    path.startsWith("/login") ||
-    path.startsWith("/skapa-konto") ||
-    path.startsWith("/glomt-losenord") ||
-    path.startsWith("/nytt-losenord") ||
-    path.startsWith("/auth/callback");
-
+  const isPublic = path.startsWith("/login") || path.startsWith("/skapa-konto") || path.startsWith("/glomt-losenord") || path.startsWith("/nytt-losenord") || path.startsWith("/auth/callback") || path.startsWith("/manifest") || path.startsWith("/installera");
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
