@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ensureCompany } from "@/lib/auth/ensure-company";
 import { swedishAuthError } from "@/lib/auth/errors";
 import { createClient } from "@/lib/supabase/client";
 
@@ -40,17 +41,24 @@ export function SignupForm() {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    setLoading(false);
     if (signUpError || !data.user) {
+      setLoading(false);
       setError(swedishAuthError(signUpError?.message ?? "Kunde inte skapa konto"));
       return;
     }
     if (!data.session) {
-      setStatus("Kolla mejlen och klicka på länken. Sen är du inne.");
+      setLoading(false);
+      setStatus("Kolla mejlen och klicka på länken. Företaget skapas när du kommer tillbaka.");
       return;
     }
-    router.push("/");
-    router.refresh();
+    try {
+      await ensureCompany(supabase, { fullName, companyName });
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      setLoading(false);
+      setError(err instanceof Error ? err.message : "Kontot skapades men företaget kunde inte sparas.");
+    }
   }
 
   return (
