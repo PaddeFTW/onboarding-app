@@ -6,7 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useSyncExternalStore,
+  useState,
   type ReactNode,
 } from "react";
 
@@ -18,229 +18,124 @@ import {
   type OnboardingInstance,
   type StepResponse,
 } from "@/lib/onboarding-steps";
-
-const STORAGE_KEY = "onboarding-app-guided-instances";
-const EMPTY_SERVER_SNAPSHOT: OnboardingInstance[] = [];
-
-const listeners = new Set<() => void>();
-let cachedSnapshot: OnboardingInstance[] = EMPTY_SERVER_SNAPSHOT;
-let storeReady = false;
+import {
+  listGuidedInstances,
+  upsertGuidedInstance,
+  type StoredGuidedInstance,
+} from "@/lib/supabase/guided-repository";
 
 interface GuidedOnboardingContextValue {
-  instances: OnboardingInstance[];
+  instances: StoredGuidedInstance[];
   isHydrated: boolean;
-  getInstance: (id: string) => OnboardingInstance | undefined;
+  error: string;
+  getInstance: (id: string) => StoredGuidedInstance | undefined;
   ensureDemoInstance: () => void;
-  updateStepResponse: (
-    instanceId: string,
-    stepId: string,
-    response: StepResponse
-  ) => void;
-  completeStep: (
-    instanceId: string,
-    stepId: string,
-    response: StepResponse,
-    completedBy?: string
-  ) => void;
+  rememberInstance: (instance: StoredGuidedInstance) => void;
+  addInstance: (instance: StoredGuidedInstance) => void;
+  updateStepResponse: (instanceId: string, stepId: string, response: StepResponse) => void;
+  completeStep: (instanceId: string, stepId: string, response: StepResponse, completedBy?: string) => void;
   setCurrentStep: (instanceId: string, stepId: string) => void;
   resetInstance: (instanceId: string) => void;
 }
 
-const GuidedOnboardingContext =
-  createContext<GuidedOnboardingContextValue | null>(null);
+const GuidedOnboardingContext = createContext<GuidedOnboardingContextValue | null>(null);
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function emitChange() {
-  listeners.forEach((listener) => listener());
-}
-
-function normalizeStoredInstance(value: unknown): OnboardingInstance | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<OnboardingInstance>;
-  if (typeof candidate.id !== "string" || !Array.isArray(candidate.steps)) {
-    return null;
-  }
-
-  return recomputeInstanceState({
-    ...candidate,
-    steps: candidate.steps.filter(
-      (step): step is OnboardingInstance["steps"][number] =>
-        Boolean(step && typeof step === "object" && typeof step.id === "string")
-    ).map((step) => ({
-      ...step,
-      response: step.response && typeof step.response === "object" ? step.response : {},
-      status: ["notStarted", "inProgress", "completed", "skipped"].includes(step.status)
-        ? step.status
-        : "notStarted",
-      completedAt: typeof step.completedAt === "string" ? step.completedAt : null,
-      completedBy: typeof step.completedBy === "string" ? step.completedBy : null,
-    })),
-  } as OnboardingInstance);
-}
-
-function loadInstancesFromStorage(): OnboardingInstance[] {
-  if (typeof window === "undefined") {
-    return EMPTY_SERVER_SNAPSHOT;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return EMPTY_SERVER_SNAPSHOT;
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.flatMap((entry) => {
-          const normalized = normalizeStoredInstance(entry);
-          return normalized ? [normalized] : [];
-        })
-      : EMPTY_SERVER_SNAPSHOT;
-  } catch {
-    return EMPTY_SERVER_SNAPSHOT;
-  }
-}
-
-function saveInstancesToStorage(instances: OnboardingInstance[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(instances));
-}
-
-function initStoreFromStorage() {
-  if (typeof window === "undefined" || storeReady) {
-    return;
-  }
-
-  cachedSnapshot = loadInstancesFromStorage();
-  storeReady = true;
-}
-
-function getSnapshot(): OnboardingInstance[] {
-  return cachedSnapshot;
-}
-
-function getServerSnapshot(): OnboardingInstance[] {
-  return EMPTY_SERVER_SNAPSHOT;
-}
-
-function getHydratedSnapshot(): boolean {
-  return storeReady;
-}
-
-function getHydratedServerSnapshot(): boolean {
-  return false;
-}
-
-function replaceGuidedInstances(nextInstances: OnboardingInstance[]) {
-  cachedSnapshot = nextInstances;
-  saveInstancesToStorage(nextInstances);
-  emitChange();
-}
-
-function updateGuidedInstance(
-  instanceId: string,
-  updater: (instance: OnboardingInstance) => OnboardingInstance
-) {
-  replaceGuidedInstances(
-    cachedSnapshot.map((instance) =>
-      instance.id === instanceId
-        ? recomputeInstanceState(updater(instance))
-        : instance
-    )
-  );
+function asStored(instance: OnboardingInstance): StoredGuidedInstance {
+  return instance as StoredGuidedInstance;
 }
 
 export function GuidedOnboardingProvider({ children }: { children: ReactNode }) {
+  const [instances, setInstances] = useState<StoredGuidedInstance[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    initStoreFromStorage();
-    emitChange();
+    let active = true;
+    listGuidedInstances()
+      .then((rows) => {
+        if (!active) return;
+        setInstances(rows);
+        setError("");
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : "Kunde inte ladda guidningar.");
+      })
+      .finally(() => {
+        if (active) setIsHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const instances = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot
-  );
-  const isHydrated = useSyncExternalStore(
-    subscribe,
-    getHydratedSnapshot,
-    getHydratedServerSnapshot
-  );
+  const persist = useCallback((instance: StoredGuidedInstance) => {
+    setInstances((current) => [
+      instance,
+      ...current.filter((existing) => existing.id !== instance.id),
+    ]);
+    void upsertGuidedInstance(instance).catch((saveError: unknown) => {
+      setError(saveError instanceof Error ? saveError.message : "Kunde inte spara guidningen.");
+    });
+  }, []);
 
   const ensureDemoInstance = useCallback(() => {
-    const existing = cachedSnapshot.find(
-      (instance) => instance.id === DEMO_GUIDED_ONBOARDING_ID
-    );
+    if (instances.some((instance) => instance.id === DEMO_GUIDED_ONBOARDING_ID)) return;
+    persist(asStored(recomputeInstanceState(createDemoGuidedOnboarding())));
+  }, [instances, persist]);
 
-    if (existing) {
-      return;
-    }
-
-    const demo = recomputeInstanceState(createDemoGuidedOnboarding());
-    replaceGuidedInstances([demo, ...cachedSnapshot]);
-  }, []);
-
-  const value = useMemo<GuidedOnboardingContextValue>(
-    () => ({
-      instances,
-      isHydrated,
-      getInstance: (id) => instances.find((instance) => instance.id === id),
-      ensureDemoInstance,
-      updateStepResponse: (instanceId, stepId, response) => {
-        updateGuidedInstance(instanceId, (instance) =>
-          withUpdatedStep(instance, stepId, (step) => ({
-            ...step,
-            status: step.status === "notStarted" ? "inProgress" : step.status,
-            response: { ...step.response, ...response },
-          }))
-        );
-      },
-      completeStep: (instanceId, stepId, response, completedBy) => {
-        updateGuidedInstance(instanceId, (instance) =>
-          withUpdatedStep(instance, stepId, (step) => ({
-            ...step,
-            status: "completed",
-            response: { ...step.response, ...response },
-            completedAt: new Date().toISOString(),
-            completedBy: completedBy ?? instance.participantName,
-          }))
-        );
-      },
-      setCurrentStep: (instanceId, stepId) => {
-        updateGuidedInstance(instanceId, (instance) => ({
-          ...instance,
-          currentStepId: stepId,
-          status: instance.status === "notStarted" ? "ongoing" : instance.status,
-          steps: instance.steps.map((step) =>
-            step.id === stepId && step.status === "notStarted"
-              ? { ...step, status: "inProgress" }
-              : step
-          ),
-        }));
-      },
-      resetInstance: (instanceId) => {
-        if (instanceId !== DEMO_GUIDED_ONBOARDING_ID) {
-          return;
-        }
-
-        const demo = recomputeInstanceState(createDemoGuidedOnboarding());
-        replaceGuidedInstances([
-          demo,
-          ...cachedSnapshot.filter((instance) => instance.id !== instanceId),
-        ]);
-      },
-    }),
-    [ensureDemoInstance, instances, isHydrated]
-  );
+  const value = useMemo<GuidedOnboardingContextValue>(() => ({
+    instances,
+    isHydrated,
+    error,
+    getInstance: (id) => instances.find((instance) => instance.id === id),
+    ensureDemoInstance,
+    rememberInstance: (instance) => {
+      setInstances((current) => [
+        instance,
+        ...current.filter((existing) => existing.id !== instance.id),
+      ]);
+    },
+    addInstance: persist,
+    updateStepResponse: (instanceId, stepId, response) => {
+      const current = instances.find((instance) => instance.id === instanceId);
+      if (!current) return;
+      persist(asStored(recomputeInstanceState(withUpdatedStep(current, stepId, (step) => ({
+        ...step,
+        status: step.status === "notStarted" ? "inProgress" : step.status,
+        response: { ...step.response, ...response },
+      })))));
+    },
+    completeStep: (instanceId, stepId, response, completedBy) => {
+      const current = instances.find((instance) => instance.id === instanceId);
+      if (!current) return;
+      persist(asStored(recomputeInstanceState(withUpdatedStep(current, stepId, (step) => ({
+        ...step,
+        status: "completed",
+        response: { ...step.response, ...response },
+        completedAt: new Date().toISOString(),
+        completedBy: completedBy ?? current.participantName,
+      })))));
+    },
+    setCurrentStep: (instanceId, stepId) => {
+      const current = instances.find((instance) => instance.id === instanceId);
+      if (!current) return;
+      persist(asStored(recomputeInstanceState({
+        ...current,
+        currentStepId: stepId,
+        status: current.status === "notStarted" ? "ongoing" : current.status,
+        steps: current.steps.map((step) =>
+          step.id === stepId && step.status === "notStarted"
+            ? { ...step, status: "inProgress" }
+            : step
+        ),
+      })));
+    },
+    resetInstance: (instanceId) => {
+      if (instanceId !== DEMO_GUIDED_ONBOARDING_ID) return;
+      persist(asStored(recomputeInstanceState(createDemoGuidedOnboarding())));
+    },
+  }), [ensureDemoInstance, instances, isHydrated, error, persist]);
 
   return (
     <GuidedOnboardingContext.Provider value={value}>
@@ -251,12 +146,8 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
 
 export function useGuidedOnboardingStore() {
   const context = useContext(GuidedOnboardingContext);
-
   if (!context) {
-    throw new Error(
-      "useGuidedOnboardingStore must be used within a GuidedOnboardingProvider"
-    );
+    throw new Error("useGuidedOnboardingStore must be used within a GuidedOnboardingProvider");
   }
-
   return context;
 }
