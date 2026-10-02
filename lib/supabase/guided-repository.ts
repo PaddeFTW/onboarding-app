@@ -1,5 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 
+import { getCurrentCompanyId } from "@/lib/auth/ensure-company";
 import {
   recomputeInstanceState,
   type OnboardingInstance,
@@ -14,6 +15,7 @@ export interface StoredGuidedInstance extends OnboardingInstance {
 
 interface GuidedRow {
   id: string;
+  company_id: string | null;
   title: string;
   participant_name: string;
   responsible_name: string;
@@ -29,16 +31,14 @@ interface GuidedRow {
 
 function toAppError(error: PostgrestError | Error, fallback: string) {
   const message = error.message || fallback;
-  if (message.includes("guided_instances") || message.includes("schema cache")) {
-    return new Error(
-      "Tabellen guided_instances saknas. Kör supabase/migrations/20261002025000_company_templates_and_guided.sql i Supabase."
-    );
+  if (message.includes("schema cache") || message.includes("company_id")) {
+    return new Error("Företagsisoleringen saknas. Kör supabase/migrations/20261002140000_company_isolation.sql.");
   }
   return new Error(message);
 }
 
 function mapRow(row: GuidedRow): StoredGuidedInstance {
-  return recomputeInstanceState({
+  const instance = recomputeInstanceState({
     id: row.id,
     title: row.title,
     participantName: row.participant_name,
@@ -50,11 +50,27 @@ function mapRow(row: GuidedRow): StoredGuidedInstance {
     completedAt: row.completed_at,
     steps: Array.isArray(row.steps) ? row.steps : [],
   }) as StoredGuidedInstance;
+  instance.templateVersionId = row.template_version_id;
+  instance.templateLabel = row.template_label;
+  return instance;
 }
 
-function toRow(instance: StoredGuidedInstance): GuidedRow {
-  return {
+export async function listGuidedInstances() {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("guided_instances")
+    .select("id,company_id,title,participant_name,responsible_name,status,current_step_id,progress,started_at,completed_at,steps,template_version_id,template_label")
+    .order("started_at", { ascending: false });
+  if (error) throw toAppError(error, "Kunde inte ladda guidningar.");
+  return ((data ?? []) as GuidedRow[]).map(mapRow);
+}
+
+export async function upsertGuidedInstance(instance: StoredGuidedInstance) {
+  const supabase = getSupabaseBrowserClient();
+  const companyId = await getCurrentCompanyId(supabase);
+  const { error } = await supabase.from("guided_instances").upsert({
     id: instance.id,
+    company_id: companyId,
     title: instance.title,
     participant_name: instance.participantName,
     responsible_name: instance.responsibleName,
@@ -66,26 +82,7 @@ function toRow(instance: StoredGuidedInstance): GuidedRow {
     steps: instance.steps,
     template_version_id: instance.templateVersionId ?? null,
     template_label: instance.templateLabel ?? null,
-  };
-}
-
-export async function listGuidedInstances() {
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from("guided_instances")
-    .select("id,title,participant_name,responsible_name,status,current_step_id,progress,started_at,completed_at,steps,template_version_id,template_label")
-    .order("started_at", { ascending: false });
-
-  if (error) throw toAppError(error, "Kunde inte ladda guidningar.");
-  return ((data ?? []) as GuidedRow[]).map(mapRow);
-}
-
-export async function upsertGuidedInstance(instance: StoredGuidedInstance) {
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase
-    .from("guided_instances")
-    .upsert(toRow(instance), { onConflict: "id" });
-
+  }, { onConflict: "id" });
   if (error) throw toAppError(error, "Kunde inte spara guidningen.");
   return instance;
 }
