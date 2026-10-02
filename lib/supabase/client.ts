@@ -1,32 +1,21 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 let browserClient: SupabaseClient | null = null;
 
-export function getSupabaseBrowserClient() {
-  if (browserClient) {
-    return browserClient;
-  }
-
+function env() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error("Supabase saknas i miljövariablerna.");
+  return { url, key };
+}
 
-  if (
-    !url ||
-    !publishableKey ||
-    url.includes("your-project-ref") ||
-    publishableKey.includes("your-supabase-publishable-key")
-  ) {
-    throw new Error(
-      "Supabase is not configured. Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local."
-    );
-  }
+export function createClient() {
+  const { url, key } = env();
+  return createBrowserClient(url, key);
+}
 
-  browserClient = createClient(url, publishableKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
+export function getSupabaseBrowserClient() {
+  if (!browserClient) browserClient = createClient();
   return browserClient;
 }
