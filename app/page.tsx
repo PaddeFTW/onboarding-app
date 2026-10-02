@@ -22,7 +22,6 @@ export default function HomePage() {
 
   return (
     <PageContainer className="relative flex flex-col gap-14 overflow-hidden sm:gap-16">
-      {/* ── Decorative background glow ──────────────────────────── */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-40 -top-40 size-[560px] rounded-full bg-primary/5 blur-[80px]"
@@ -32,7 +31,6 @@ export default function HomePage() {
         className="pointer-events-none absolute -bottom-40 -left-20 size-96 rounded-full bg-violet-500/[0.04] blur-[60px]"
       />
 
-      {/* ── Hero ─────────────────────────────────────────────────── */}
       <header className="relative flex flex-col gap-6 animate-fade-up sm:gap-7">
         <div className="flex flex-col gap-2.5">
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-primary/60">
@@ -45,15 +43,19 @@ export default function HomePage() {
             Hantera och följ upp dina medarbetares onboarding-program.
           </p>
         </div>
-        <Button size="lg" className="w-full sm:w-fit" asChild>
-          <Link href="/onboarding/new">
-            <Plus />
-            Ny onboarding
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button size="lg" className="w-full sm:w-fit" asChild>
+            <Link href="/onboarding/new">
+              <Plus />
+              Ny onboarding
+            </Link>
+          </Button>
+          <Button size="lg" variant="outline" className="w-full sm:w-fit" asChild>
+            <Link href="/onboarding/templates">Företagsmallar</Link>
+          </Button>
+        </div>
       </header>
 
-      {/* ── Guidat flöde — förhandsvisning ──────────────────────── */}
       <section
         className="relative animate-fade-up"
         style={{ animationDelay: "0.06s" }}
@@ -63,7 +65,6 @@ export default function HomePage() {
           href="/onboarding/guided/demo-byggco"
           className="group relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-primary-light p-5 transition-all duration-200 hover:border-primary/35 hover:shadow-[0_4px_20px_-4px_rgba(99,102,241,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6"
         >
-          {/* Subtle background glow on hover */}
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/[0.06] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
@@ -95,7 +96,6 @@ export default function HomePage() {
         </Link>
       </section>
 
-      {/* ── Pågående ─────────────────────────────────────────────── */}
       <section
         className="relative flex flex-col gap-5 animate-fade-up"
         style={{ animationDelay: "0.12s" }}
@@ -138,7 +138,6 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ── Slutförda ────────────────────────────────────────────── */}
       <section
         className="relative flex flex-col gap-5 animate-fade-up"
         style={{ animationDelay: "0.18s" }}

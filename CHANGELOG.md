@@ -2,27 +2,15 @@
 
 ## Unreleased
 
-### Hybrid Foundation — Del 2 (klar, i produktion)
+### Hybrid Foundation — Del 3 (Supabase)
 
-- Härdad återupptagning och normalisering av sparad onboardingdata
-- Gemensam kontroll för kvarstående obligatoriska steg
-- Förbättrad completion-/sammanfattningsvy och draft-hantering
-- Mergad till `main` via PR #4 (2026-09-07)
-
-### Hybrid Foundation — Del 1 (klar)
-
-- Planering för Hybrid Foundation med guidad kärnupplevelse
-- Arkitekturdokument: `GUIDED_ONBOARDING_INTEGRATION_PLAN.md`, `HYBRID_ARCHITECTURE.md`, `HYBRID_IMPLEMENTATION_PLAN.md`, `DOMAIN_MODEL.md`
-- Steg-för-steg-flöde, fyra stegtyper, stegöversikt, lokal sparning, slutförande
-- Förhandsvisning från startsidan (`/onboarding/guided/demo-byggco`)
-
-### Documentation (Sprint 0)
-
-- Release Candidate 1 verifierad och Version 1.0 låst
-- Arkitektur- och planeringsdokument för nästa version
+- Företagsmallar sparas i `company_template_versions`
+- Guidningar sparas i `guided_instances`, inklusive fryst stegsnapshot
+- Systemmall är fortfarande låst i koden
+- Öppen åtkomst som checklistan tills Del 4 lägger på auth
+- Migration: `supabase/migrations/20261002025000_company_templates_and_guided.sql`
 
 ### Notes
 
-- Guidade instanser lagras fortfarande bara i webbläsaren
-- Befintlig checklista, Supabase-flöde och export är oförändrade
-- Inga nya npm-paket har installerats för Del 1–2
+- Checklistan, exporten och befintliga Supabase-tabeller är oförändrade
+- Inga nya npm-paket
