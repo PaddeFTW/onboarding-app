@@ -1,13 +1,13 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 
-import {
-  type CompanyTemplateVersion,
-} from "@/lib/company-templates";
+import { getCurrentCompanyId } from "@/lib/auth/ensure-company";
+import { type CompanyTemplateVersion } from "@/lib/company-templates";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface TemplateRow {
   id: string;
   template_id: string;
+  company_id: string | null;
   company_name: string;
   name: string;
   version_label: string;
@@ -22,10 +22,8 @@ interface TemplateRow {
 
 function toAppError(error: PostgrestError | Error, fallback: string) {
   const message = error.message || fallback;
-  if (message.includes("company_template_versions") || message.includes("schema cache")) {
-    return new Error(
-      "Tabellen company_template_versions saknas. Kör supabase/migrations/20261002025000_company_templates_and_guided.sql i Supabase."
-    );
+  if (message.includes("company_id") || message.includes("schema cache")) {
+    return new Error("Företagsisoleringen saknas i databasen.");
   }
   return new Error(message);
 }
@@ -47,10 +45,22 @@ function mapRow(row: TemplateRow): CompanyTemplateVersion {
   };
 }
 
-function toRow(version: CompanyTemplateVersion): TemplateRow {
-  return {
+const columns = "id,template_id,company_id,company_name,name,version_label,status,based_on_version_id,source,steps,created_at,published_at,archived_at";
+
+export async function listTemplateVersions() {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase.from("company_template_versions").select(columns).order("created_at", { ascending: false });
+  if (error) throw toAppError(error, "Kunde inte ladda mallar.");
+  return ((data ?? []) as TemplateRow[]).map(mapRow);
+}
+
+export async function saveTemplateVersion(version: CompanyTemplateVersion) {
+  const supabase = getSupabaseBrowserClient();
+  const companyId = await getCurrentCompanyId(supabase);
+  const { error } = await supabase.from("company_template_versions").upsert({
     id: version.id,
     template_id: version.templateId,
+    company_id: companyId,
     company_name: version.companyName,
     name: version.name,
     version_label: version.versionLabel,
@@ -61,29 +71,7 @@ function toRow(version: CompanyTemplateVersion): TemplateRow {
     created_at: version.createdAt,
     published_at: version.publishedAt,
     archived_at: version.archivedAt,
-  };
-}
-
-const columns =
-  "id,template_id,company_name,name,version_label,status,based_on_version_id,source,steps,created_at,published_at,archived_at";
-
-export async function listTemplateVersions() {
-  const supabase = getSupabaseBrowserClient();
-  const { data, error } = await supabase
-    .from("company_template_versions")
-    .select(columns)
-    .order("created_at", { ascending: false });
-
-  if (error) throw toAppError(error, "Kunde inte ladda mallar.");
-  return ((data ?? []) as TemplateRow[]).map(mapRow);
-}
-
-export async function saveTemplateVersion(version: CompanyTemplateVersion) {
-  const supabase = getSupabaseBrowserClient();
-  const { error } = await supabase
-    .from("company_template_versions")
-    .upsert(toRow(version), { onConflict: "id" });
-
+  }, { onConflict: "id" });
   if (error) throw toAppError(error, "Kunde inte spara mallen.");
   return version;
 }
