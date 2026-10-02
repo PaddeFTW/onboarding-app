@@ -306,10 +306,6 @@ export function applyStepVisibility(instance: OnboardingInstance): OnboardingIns
           : step;
       }
 
-      if (step.status === "completed" || step.status === "inProgress") {
-        return step;
-      }
-
       return {
         ...step,
         status: "skipped" as StepStatus,

@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronRight,
   List,
+  RotateCcw,
 } from "lucide-react";
 
 import {
@@ -37,6 +38,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,9 +72,11 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
     completeStep,
     updateStepResponse,
     setCurrentStep,
+    resetInstance,
   } = useGuidedOnboardingStore();
 
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [stepDrafts, setStepDrafts] = useState<Record<string, StepResponse>>({});
 
@@ -121,7 +132,12 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   }
 
   if (instance.status === "completed") {
-    return <GuidedCompletionView instance={instance} />;
+    return (
+      <GuidedCompletionView
+        instance={instance}
+        onReset={() => resetInstance(instance.id)}
+      />
+    );
   }
 
   if (!currentStep) {
@@ -285,6 +301,16 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
           Stegöversikt
         </Button>
 
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setResetOpen(true)}
+          className="w-full sm:w-auto"
+        >
+          <RotateCcw />
+          Börja om
+        </Button>
+
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
@@ -314,6 +340,16 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
         instance={activeInstance}
         visibleSteps={visibleSteps}
         onJump={handleJumpToStep}
+      />
+      <ResetDemoDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        onConfirm={() => {
+          resetInstance(activeInstance.id);
+          setStepDrafts({});
+          setResetOpen(false);
+          toast.success("Demon är återställd.");
+        }}
       />
     </PageContainer>
   );
@@ -543,7 +579,45 @@ function StepOverviewSheet({
   );
 }
 
-function GuidedCompletionView({ instance }: { instance: OnboardingInstance }) {
+function ResetDemoDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Börja om demon?</DialogTitle>
+          <DialogDescription>
+            Svaren i förhandsvisningen tas bort. Checklistan på startsidan rörs inte.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Avbryt
+          </Button>
+          <Button type="button" onClick={onConfirm}>
+            Börja om
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GuidedCompletionView({
+  instance,
+  onReset,
+}: {
+  instance: OnboardingInstance;
+  onReset: () => void;
+}) {
+  const [resetOpen, setResetOpen] = useState(false);
   const visibleSteps = getVisibleSteps(instance);
   const completedCount = countCompletedVisibleSteps(instance);
   const incompleteRequired = getIncompleteRequiredSteps(instance);
@@ -628,16 +702,36 @@ function GuidedCompletionView({ instance }: { instance: OnboardingInstance }) {
           )}
         </Card>
 
-        <Button size="lg" className="w-full sm:w-auto" asChild>
-          <Link href="/">
-            <ArrowLeft />
-            Startsidan
-          </Link>
-        </Button>
+        <div className="flex w-full max-w-md flex-col gap-2 sm:w-auto">
+          <Button size="lg" className="w-full" asChild>
+            <Link href="/">
+              <ArrowLeft />
+              Startsidan
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={() => setResetOpen(true)}
+          >
+            <RotateCcw />
+            Börja om demon
+          </Button>
+        </div>
 
         <p className="text-xs text-muted-foreground/70">
-          Sparat i den här webbläsaren.
+          Sparat i den här webbläsaren. Checklistan påverkas inte.
         </p>
+        <ResetDemoDialog
+          open={resetOpen}
+          onOpenChange={setResetOpen}
+          onConfirm={() => {
+            onReset();
+            setResetOpen(false);
+          }}
+        />
       </div>
     </PageContainer>
   );

@@ -43,7 +43,7 @@ export default function HomePage() {
             Hantera och följ upp dina medarbetares onboarding-program.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button size="lg" className="w-full sm:w-fit" asChild>
             <Link href="/onboarding/new">
               <Plus />
@@ -52,6 +52,9 @@ export default function HomePage() {
           </Button>
           <Button size="lg" variant="outline" className="w-full sm:w-fit" asChild>
             <Link href="/onboarding/templates">Företagsmallar</Link>
+          </Button>
+          <Button size="lg" variant="ghost" className="w-full sm:w-fit" asChild>
+            <Link href="/login">Logga in</Link>
           </Button>
         </div>
       </header>
