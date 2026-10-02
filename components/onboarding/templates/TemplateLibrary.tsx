@@ -19,6 +19,7 @@ import {
   createDraftFromPublished,
   createDraftFromSystemTemplate,
   createInstanceFromPublishedVersion,
+  getCompanyTemplateError,
   getCompanyTemplateServerSnapshot,
   getCompanyTemplateSnapshot,
   getCompanyTemplatesHydrated,
@@ -39,13 +40,14 @@ function statusLabel(status: CompanyTemplateVersion["status"]) {
 
 export function TemplateLibrary() {
   const router = useRouter();
-  const { addInstance } = useGuidedOnboardingStore();
+  const { rememberInstance } = useGuidedOnboardingStore();
   const [participantName, setParticipantName] = useState("");
   const [responsibleName, setResponsibleName] = useState("");
   const [startError, setStartError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    initCompanyTemplateStore();
+    void initCompanyTemplateStore();
   }, []);
 
   const versions = useSyncExternalStore(
@@ -58,8 +60,24 @@ export function TemplateLibrary() {
     getCompanyTemplatesHydrated,
     () => false
   );
-
+  const storeError = useSyncExternalStore(
+    subscribeCompanyTemplates,
+    getCompanyTemplateError,
+    () => ""
+  );
   const hasDraft = versions.some((version) => version.status === "draft");
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setStartError("");
+    try {
+      await action();
+    } catch (error) {
+      setStartError(error instanceof Error ? error.message : "Kunde inte spara i Supabase.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function startFrom(version: CompanyTemplateVersion) {
     if (!participantName.trim() || !responsibleName.trim()) {
@@ -67,13 +85,15 @@ export function TemplateLibrary() {
       return;
     }
 
-    const instance = createInstanceFromPublishedVersion(
-      version,
-      participantName.trim(),
-      responsibleName.trim()
-    );
-    addInstance(instance);
-    router.push(`/onboarding/guided/${instance.id}`);
+    void run(async () => {
+      const instance = await createInstanceFromPublishedVersion(
+        version,
+        participantName.trim(),
+        responsibleName.trim()
+      );
+      rememberInstance(instance);
+      router.push(`/onboarding/guided/${instance.id}`);
+    });
   }
 
   return (
@@ -87,13 +107,17 @@ export function TemplateLibrary() {
 
       <header className="flex flex-col gap-2">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-primary/60">
-          Del 3 — förhandsvisning
+          Del 3 — Supabase
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">Företagsmallar</h1>
-        <p className="max-w-[58ch] text-sm leading-relaxed text-muted-foreground">
-          Systemmallen är låst. Företaget kopierar den till ett utkast, publicerar en version och startar onboarding från en fryst kopia. Allt sparas bara i den här webbläsaren.
+        <p className="max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
+          Systemmallen är låst. Utkast, publicerade versioner och guidningar sparas i Supabase. Inloggning och företagsisolering kommer i Del 4.
         </p>
       </header>
+
+      {storeError ? (
+        <Card className="border-destructive/30 p-4 text-sm text-destructive">{storeError}</Card>
+      ) : null}
 
       <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -107,8 +131,8 @@ export function TemplateLibrary() {
         </div>
         <Button
           type="button"
-          onClick={() => createDraftFromSystemTemplate()}
-          disabled={!isHydrated || hasDraft}
+          disabled={!isHydrated || hasDraft || busy}
+          onClick={() => void run(() => createDraftFromSystemTemplate())}
         >
           <Plus />
           Skapa utkast
@@ -118,137 +142,68 @@ export function TemplateLibrary() {
       <Card className="grid gap-4 p-5 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="participant">Deltagare</Label>
-          <Input
-            id="participant"
-            value={participantName}
-            onChange={(event) => setParticipantName(event.target.value)}
-            placeholder="Namn på ny medarbetare"
-          />
+          <Input id="participant" value={participantName} onChange={(event) => setParticipantName(event.target.value)} placeholder="Namn på ny medarbetare" />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="responsible">Ansvarig</Label>
-          <Input
-            id="responsible"
-            value={responsibleName}
-            onChange={(event) => setResponsibleName(event.target.value)}
-            placeholder="Närmaste chef"
-          />
+          <Input id="responsible" value={responsibleName} onChange={(event) => setResponsibleName(event.target.value)} placeholder="Närmaste chef" />
         </div>
-        {startError ? (
-          <p className="text-sm text-destructive sm:col-span-2">{startError}</p>
-        ) : null}
+        {startError ? <p className="text-sm text-destructive sm:col-span-2">{startError}</p> : null}
       </Card>
 
       <div className="flex flex-col gap-3">
         {!isHydrated ? (
-          <p className="text-sm text-muted-foreground">Laddar mallar...</p>
+          <p className="text-sm text-muted-foreground">Laddar mallar från Supabase...</p>
         ) : versions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Ingen företagsmall ännu. Skapa ett utkast från systemmallen.
-          </p>
+          <p className="text-sm text-muted-foreground">Ingen företagsmall ännu. Skapa ett utkast från systemmallen.</p>
         ) : (
           versions.map((version) => (
             <Card key={version.id} className="flex flex-col gap-4 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-semibold">
-                      {version.companyName} — {version.name}
-                    </h2>
+                    <h2 className="font-semibold">{version.companyName} — {version.name}</h2>
                     <Badge variant="outline">{statusLabel(version.status)}</Badge>
                     <Badge variant="outline">{version.versionLabel}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {version.steps.length} steg
-                    {version.basedOnVersionId ? " · kopierad från publicerad version" : ""}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{version.steps.length} steg</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {version.status === "draft" ? (
-                    <Button type="button" onClick={() => publishDraft(version.id)}>
-                      Publicera
-                    </Button>
+                    <Button type="button" disabled={busy} onClick={() => void run(() => publishDraft(version.id))}>Publicera</Button>
                   ) : null}
                   {version.status === "published" ? (
                     <>
-                      <Button type="button" onClick={() => startFrom(version)}>
-                        Starta onboarding
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={hasDraft}
-                        onClick={() => createDraftFromPublished(version.id)}
-                      >
-                        Nytt utkast
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => archivePublished(version.id)}
-                      >
-                        Arkivera
-                      </Button>
+                      <Button type="button" disabled={busy} onClick={() => startFrom(version)}>Starta onboarding</Button>
+                      <Button type="button" variant="outline" disabled={hasDraft || busy} onClick={() => void run(() => createDraftFromPublished(version.id))}>Nytt utkast</Button>
+                      <Button type="button" variant="outline" disabled={busy} onClick={() => void run(() => archivePublished(version.id))}>Arkivera</Button>
                     </>
                   ) : null}
                 </div>
               </div>
-
               {version.status === "draft" ? (
                 <div className="flex flex-col gap-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label htmlFor={`company-${version.id}`}>Företag</Label>
-                      <Input
-                        id={`company-${version.id}`}
-                        value={version.companyName}
-                        onChange={(event) =>
-                          updateDraft(version.id, (current) => ({
-                            ...current,
-                            companyName: event.target.value,
-                          }))
-                        }
-                      />
+                      <Input id={`company-${version.id}`} value={version.companyName} onChange={(event) => void updateDraft(version.id, (current) => ({ ...current, companyName: event.target.value }))} />
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label htmlFor={`name-${version.id}`}>Mallnamn</Label>
-                      <Input
-                        id={`name-${version.id}`}
-                        value={version.name}
-                        onChange={(event) =>
-                          updateDraft(version.id, (current) => ({
-                            ...current,
-                            name: event.target.value,
-                          }))
-                        }
-                      />
+                      <Input id={`name-${version.id}`} value={version.name} onChange={(event) => void updateDraft(version.id, (current) => ({ ...current, name: event.target.value }))} />
                     </div>
                   </div>
                   <ul className="flex flex-col gap-2">
                     {version.steps.map((step) => (
-                      <li
-                        key={step.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm"
-                      >
-                        <span>
-                          {step.order}. {step.title}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDraftStep(version.id, step.id)}
-                        >
-                          Ta bort
-                        </Button>
+                      <li key={step.id} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm">
+                        <span>{step.order}. {step.title}</span>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => void run(() => removeDraftStep(version.id, step.id))}>Ta bort</Button>
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  Publicerad version är låst. Nya onboardingar får en egen kopia och påverkas inte av senare utkast.
-                </p>
+                <p className="text-xs text-muted-foreground">Publicerad version är låst. Nya onboardingar får en egen kopia i Supabase.</p>
               )}
             </Card>
           ))

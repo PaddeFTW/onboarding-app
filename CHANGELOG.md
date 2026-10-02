@@ -2,28 +2,15 @@
 
 ## Unreleased
 
-### Hybrid Foundation — Del 3 (lokal förhandsvisning)
+### Hybrid Foundation — Del 3 (Supabase)
 
-- Systemmall är låst och kan bara kopieras
-- Företagsutkast kan döpas om och få steg borttagna
-- Publicerad version är låst; ny onboarding får en fryst kopia
-- Arkivering stoppar nya onboardingar från den versionen
-- Sparning sker bara i webbläsaren, route `/onboarding/templates`
-
-### Hybrid Foundation — Del 2 (klar, i produktion)
-
-- Härdad återupptagning och normalisering av sparad onboardingdata
-- Gemensam kontroll för kvarstående obligatoriska steg
-- Förbättrad completion-/sammanfattningsvy och draft-hantering
-- Mergad till `main` via PR #4, status via PR #5
-
-### Hybrid Foundation — Del 1 (klar)
-
-- Steg-för-steg-flöde, fyra stegtyper, stegöversikt, lokal sparning, slutförande
-- Förhandsvisning från startsidan (`/onboarding/guided/demo-byggco`)
+- Företagsmallar sparas i `company_template_versions`
+- Guidningar sparas i `guided_instances`, inklusive fryst stegsnapshot
+- Systemmall är fortfarande låst i koden
+- Öppen åtkomst som checklistan tills Del 4 lägger på auth
+- Migration: `supabase/migrations/20261002025000_company_templates_and_guided.sql`
 
 ### Notes
 
-- Guidade instanser och mallversioner lagras fortfarande bara i webbläsaren
-- Befintlig checklista, Supabase-flöde och export är oförändrade
+- Checklistan, exporten och befintliga Supabase-tabeller är oförändrade
 - Inga nya npm-paket
