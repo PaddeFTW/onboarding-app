@@ -48,10 +48,7 @@ export function LoginScreen() {
     event.preventDefault();
     setError(null);
     setLoading(true);
-    const { error: signInError } = await createClient().auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    const { error: signInError } = await createClient().auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (signInError) {
       setError("Fel e-post eller lösenord.");
@@ -74,6 +71,10 @@ export function LoginScreen() {
     <main className="flex min-h-dvh items-center justify-center bg-[#f7f7f8] px-4 py-10">
       <div className="w-full max-w-[420px]">
         <header className="mb-8 text-center">
+          <div className="mb-4 flex items-center justify-center gap-3">
+            <img alt="" className="size-12" src="/logo-mark.svg" />
+            <span className="text-[1.65rem] font-medium leading-none tracking-tight text-neutral-950">quality works</span>
+          </div>
           <p className="text-sm font-medium text-[#5b4dff]">Onboarding</p>
           <h1 className="mt-2 text-[2rem] font-semibold tracking-tight text-neutral-950">Logga in</h1>
           <p className="mt-2 text-sm text-neutral-500">Samma inloggning som i de andra apparna.</p>
