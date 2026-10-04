@@ -23,7 +23,7 @@ export async function updateSession(request: NextRequest) {
   });
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith("/login") || path.startsWith("/skapa-konto") || path.startsWith("/glomt-losenord") || path.startsWith("/nytt-losenord") || path.startsWith("/auth/callback") || path.startsWith("/manifest") || path.startsWith("/installera");
+  const isPublic = ["/login", "/skapa-konto", "/glomt-losenord", "/nytt-losenord", "/auth/callback", "/manifest", "/installera", "/integritet", "/villkor"].some((item) => path.startsWith(item));
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
