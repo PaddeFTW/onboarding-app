@@ -114,6 +114,11 @@ export function LoginScreen() {
           <span className="mx-3 text-neutral-300"> </span>
           <Link href="/glomt-losenord" className="text-neutral-500">Glömt lösenord</Link>
         </p>
+        <p className="mt-3 text-center text-xs text-neutral-400">
+          <Link href="/integritet">Integritet</Link>
+          <span className="mx-2">·</span>
+          <Link href="/villkor">Villkor</Link>
+        </p>
       </div>
     </main>
   );
