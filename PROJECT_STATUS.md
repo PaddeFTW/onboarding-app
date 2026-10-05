@@ -2,9 +2,9 @@
 
 ## Aktuell status
 
-Version 1.0 är låst. Hybrid Foundation Del 1 och Del 2 är implementerade och verifierade på `main`.
+Version 1.0 är låst. Hybrid Foundation Del 1 och Del 2 är implementerade. Del 2 är ännu inte fullt QA-verifierad.
 
-Del 2 innehåller step overview, resume från webbläsarens `localStorage`, required-step-validering, tydlig draft/completion-status och säker normalisering av äldre eller ofullständig guided state. Guided demo är fortfarande en separat förhandsvisning och använder inte databaslagring.
+Del 2 innehåller step overview, resume från webbläsarens `localStorage`, required-step-validering, tydlig draft/completion-status och säker normalisering av äldre eller ofullständig guided state. Kod- och buildkontroller passerar, men smoke-testet saknar en körbar runner och browser-testet blockeras av runtime-felet `Supabase saknas i miljövariablerna.` i den lokala previewmiljön. Guided demo är fortfarande en separat förhandsvisning och använder inte databaslagring.
 
 Del 3–5 är inte implementerade. Företagsmallar, mallversionering, autentisering, företag/RLS, permanent guided-lagring, dokument/kunskapsbank, AI och Smart Workspace väntar till senare delar.
 
