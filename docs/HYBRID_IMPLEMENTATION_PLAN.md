@@ -2,7 +2,7 @@
 
 ## Status
 
-Praktisk implementationsplan för "Hybrid Foundation", uppdelad i fem delar. Endast Del 1 implementeras i denna fas. Del 2–5 är dokumenterade beslut om framtida arbete, inte påbörjade.
+Praktisk implementationsplan för "Hybrid Foundation", uppdelad i fem delar. Del 1 och Del 2 är implementerade och verifierade på `main`. Del 3–5 är dokumenterade framtida arbeten och inte implementerade.
 
 ## Del 1 — Guidad kärnupplevelse (denna fas)
 
