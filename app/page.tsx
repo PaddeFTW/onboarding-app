@@ -14,6 +14,8 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 
 const links = [
   ["/dokument-workspace", "Dokument"],
+  ["/moduler", "Moduler"],
+  ["/kundtest", "Kundtest"],
   ["/dokument", "Filer"],
   ["/historik", "Historik"],
   ["/ordlista", "Ordlista"],

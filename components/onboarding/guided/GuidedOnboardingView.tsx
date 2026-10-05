@@ -49,6 +49,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { knowledgeForStep } from "@/lib/knowledge-modules";
 import {
   Sheet,
   SheetBody,
@@ -371,6 +372,14 @@ function StepContent({
           <p className="text-sm leading-relaxed text-accent-foreground/90">
             {step.content}
           </p>
+        </div>
+      ) : null}
+
+      {knowledgeForStep(step.id) ? (
+        <div className="rounded-[1.35rem] border border-primary/15 bg-primary/5 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">{knowledgeForStep(step.id)?.module}</p>
+          <p className="mt-2 text-sm leading-relaxed">{knowledgeForStep(step.id)?.text}</p>
+          <Link className="mt-3 inline-block text-sm font-semibold text-primary" href="/dokument-workspace">Öppna momentet som dokument</Link>
         </div>
       ) : null}
 
