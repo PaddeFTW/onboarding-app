@@ -47,7 +47,11 @@ export default function InbjudanPage() {
       setError("Inbjudan kunde inte sparas. Kör SQL-filen för roller om tabellen saknas.");
       return;
     }
-    setStatus("Inbjudan är sparad. Personen skapar konto med samma e-post och hamnar i företaget.");
+    const { error: mailError } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
+    setStatus(mailError ? "Inbjudan är sparad. Mejlet kunde inte skickas. Personen skapar konto med samma e-post." : "Inbjudan är sparad och en inloggningslänk är skickad.");
     setEmail("");
   }
 

@@ -19,6 +19,7 @@ const links = [
   ["/dokument", "Filer"],
   ["/historik", "Historik"],
   ["/ordlista", "Ordlista"],
+  ["/policyer", "Policyer"],
   ["/installera", "Installera"],
 ];
 

@@ -55,17 +55,25 @@ function pdfEscape(value: string) {
 }
 
 export function downloadOnboardingPdf(input: { title: string; participant: string; lines: string[] }) {
-  const content = [`Onboarding: ${input.title}`, `Deltagare: ${input.participant}`, "", ...input.lines]
-    .slice(0, 40)
-    .map((line, index) => `BT /F1 11 Tf 48 ${780 - index * 18} Td (${pdfEscape(line)}) Tj ET`)
-    .join("\n");
-  const objects = [
-    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
-    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
-    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj",
-    `4 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
-    "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
-  ];
+  const plain = (value: string) => value.replace(/[åä]/g, "a").replace(/[ÅÄ]/g, "A").replace(/ö/g, "o").replace(/Ö/g, "O");
+  const lines = [`Onboarding: ${input.title}`, `Deltagare: ${input.participant}`, ""].concat(input.lines).flatMap((line) => {
+    const text = plain(line);
+    const parts = [];
+    for (let i = 0; i < text.length; i += 90) parts.push(text.slice(i, i + 90));
+    return parts.length ? parts : [""];
+  });
+  const pages = [];
+  for (let i = 0; i < lines.length; i += 40) pages.push(lines.slice(i, i + 40));
+  const objects = ["1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj"];
+  const kids = pages.map((_, index) => `${index + 3} 0 R`).join(" ");
+  objects.push(`2 0 obj << /Type /Pages /Kids [${kids}] /Count ${pages.length} >> endobj`);
+  pages.forEach((page, index) => {
+    const stream = page.map((line, lineIndex) => `BT /F1 11 Tf 48 ${780 - lineIndex * 18} Td (${pdfEscape(line)}) Tj ET`).join("\n");
+    const contentId = 3 + pages.length + index;
+    objects.push(`${index + 3} 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${3 + pages.length * 2} 0 R >> >> >> endobj`);
+    objects.push(`${contentId} 0 obj << /Length ${stream.length} >> stream\n${stream}\nendstream endobj`);
+  });
+  objects.push(`${3 + pages.length * 2} 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj`);
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
   for (const object of objects) {
@@ -84,3 +92,4 @@ export function downloadOnboardingPdf(input: { title: string; participant: strin
   link.click();
   URL.revokeObjectURL(url);
 }
+

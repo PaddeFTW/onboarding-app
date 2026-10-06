@@ -1,21 +1,14 @@
 # Project Status
 
-## Aktuell status
+## Aktuellt
 
-Version 1.0 är låst. Del 1–2 ligger på `main`.
+Production fungerar igen efter att Del 2-mergen backades. Live: https://onboarding-app-black.vercel.app/
 
-Del 3-förhandsvisningen sparar företagsmallar och guidningar i Supabase, inte i webbläsaren. Checklistan använder sina befintliga tabeller. Ingen inloggning ännu.
+Finns i main: inloggning, företag, roller och inbjudan, mallar, guidning, kunskapsmoduler i momentet, dokument per moment, Word/PDF, historik, ordlista, policyöversikt, integritet och villkor.
 
-Migration som måste köras i Supabase innan vyerna fungerar:
-`supabase/migrations/20261002025000_company_templates_and_guided.sql`
+Del 2 med localStorage-resume ligger kvar i grenen v0/guided-onboarding-local-state. Den ska inte mergas igen förrän en deploy har testats utan att middleware kraschar.
 
-## Nästa fokus
+## Kvar
 
-1. Kör migrationen i Supabase-projektet
-2. Merga branchen `feat/del3-local-company-templates`
-3. Del 4 — autentisering, företag och RLS som ersätter öppen public-policy
-4. Konsolidera stegbanken
-
-## Produktprincip
-
-Appen ska inte bli ett stort HR-system. Permanent lagring först, isolering per företag när auth finns.
+- Köra kundtestet inloggad: mall, guidning, dokument, export.
+- En exe utan internet ingår inte. Installera via Edge eller Chrome.
