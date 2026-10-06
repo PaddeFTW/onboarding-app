@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Plus, Sparkles } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { PageContainer } from "@/components/page-container";
 import { SectionHeader } from "@/components/section-header";
@@ -44,16 +44,6 @@ export default function HomePage() {
           {links.map(([href, label]) => <Link key={href} className="font-medium text-[#5b4dff]" href={href}>{label}</Link>)}
         </nav>
       </header>
-      <section aria-label="Guidat onboarding-flöde">
-        <Link href="/onboarding/guided/demo-byggco" className="group flex flex-col gap-4 rounded-2xl border border-primary/20 bg-primary-light p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2"><Sparkles className="size-3.5 text-primary" /><span className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-primary/70">Förhandsvisning</span></div>
-            <h2 className="text-[1.05rem] font-semibold">Prova det guidade flödet</h2>
-            <p className="max-w-[42ch] text-sm text-muted-foreground">En steg-för-steg-upplevelse som leder deltagaren genom programmet.</p>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Starta demo <ArrowRight className="size-4" /></span>
-        </Link>
-      </section>
       <section className="flex flex-col gap-5">
         <SectionHeader title="Pågående" description={ongoingOnboardings.length > 0 ? `${ongoingOnboardings.length} pågår` : undefined} />
         {isLoading ? <LoadingState variant="cards" count={2} /> : error ? <EmptyState title="Kunde inte ladda onboardingar" description={error} action={<Button onClick={() => void refreshOnboardings()}>Försök igen</Button>} /> : ongoingOnboardings.length === 0 ? <EmptyState title="Inga pågående onboardingar" description="Starta en ny onboarding för att komma igång." /> : <div className="flex flex-col gap-3">{ongoingOnboardings.map((o, i) => <OnboardingCard key={o.id} onboarding={o} index={i} />)}</div>}
