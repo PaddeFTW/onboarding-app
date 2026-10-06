@@ -38,7 +38,8 @@ export function LoginScreen() {
     });
     setLoading(false);
     if (otpError) {
-      setError("Länken kunde inte skickas. Kolla att e-post är påslaget i Supabase.");
+      const message = otpError.message.toLowerCase();
+      setError(message.includes("after") || message.includes("rate") ? "Vänta en minut och skicka länken igen." : otpError.message);
       return;
     }
     setStatus("sent");
