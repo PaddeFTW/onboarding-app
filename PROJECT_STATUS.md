@@ -2,19 +2,18 @@
 
 ## Aktuell status
 
-Version 1.0 är låst. Del 1–2 ligger på `main`.
+Version 1.0 är låst. Hybrid Foundation Del 1 och Del 2 är implementerade. Del 2 är ännu inte fullt QA-verifierad.
 
-Del 3-förhandsvisningen sparar företagsmallar och guidningar i Supabase, inte i webbläsaren. Checklistan använder sina befintliga tabeller. Ingen inloggning ännu.
+Del 2 innehåller step overview, resume från webbläsarens `localStorage`, required-step-validering, tydlig draft/completion-status och säker normalisering av äldre eller ofullständig guided state. Kod- och buildkontroller passerar, men smoke-testet saknar en körbar runner och browser-testet blockeras av runtime-felet `Supabase saknas i miljövariablerna.` i den lokala previewmiljön. Guided demo är fortfarande en separat förhandsvisning och använder inte databaslagring.
 
-Migration som måste köras i Supabase innan vyerna fungerar:
-`supabase/migrations/20261002025000_company_templates_and_guided.sql`
+Del 3–5 är inte implementerade. Företagsmallar, mallversionering, autentisering, företag/RLS, permanent guided-lagring, dokument/kunskapsbank, AI och Smart Workspace väntar till senare delar.
 
 ## Nästa fokus
 
-1. Kör migrationen i Supabase-projektet
-2. Merga branchen `feat/del3-local-company-templates`
-3. Del 4 — autentisering, företag och RLS som ersätter öppen public-policy
-4. Konsolidera stegbanken
+1. Konsolidera stegbanken separat från Hybrid Foundation
+2. Del 3 — företagsmallar och mallversioner
+3. Del 4 — autentisering, företag och RLS
+4. Del 5 — dokument, export och kunskapsbank
 
 ## Produktprincip
 

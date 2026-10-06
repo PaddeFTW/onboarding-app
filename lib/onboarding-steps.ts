@@ -433,6 +433,40 @@ export function getStepOverviewStatus(
   return "locked";
 }
 
+export function normalizeGuidedInstance(
+  candidate: Partial<OnboardingInstance> | null | undefined,
+  fallback: OnboardingInstance = createDemoGuidedOnboarding()
+): OnboardingInstance {
+  const candidateSteps = Array.isArray(candidate?.steps) ? candidate.steps : [];
+  const stepsById = new Map(candidateSteps.map((step) => [step.id, step]));
+  const steps = fallback.steps.map((fallbackStep) => {
+    const savedStep = stepsById.get(fallbackStep.id);
+    if (!savedStep) return fallbackStep;
+
+    return {
+      ...fallbackStep,
+      ...savedStep,
+      response: savedStep.response && typeof savedStep.response === "object"
+        ? savedStep.response
+        : {},
+      status: ["notStarted", "inProgress", "completed", "skipped"].includes(savedStep.status)
+        ? savedStep.status
+        : fallbackStep.status,
+      completedAt: typeof savedStep.completedAt === "string" ? savedStep.completedAt : null,
+      completedBy: typeof savedStep.completedBy === "string" ? savedStep.completedBy : null,
+    };
+  });
+
+  return recomputeInstanceState({
+    ...fallback,
+    ...candidate,
+    id: typeof candidate?.id === "string" ? candidate.id : fallback.id,
+    steps,
+    currentStepId: typeof candidate?.currentStepId === "string" ? candidate.currentStepId : fallback.currentStepId,
+    completedAt: typeof candidate?.completedAt === "string" ? candidate.completedAt : null,
+  });
+}
+
 export function withUpdatedStep(
   instance: OnboardingInstance,
   stepId: string,

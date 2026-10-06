@@ -13,16 +13,13 @@ import {
 import {
   DEMO_GUIDED_ONBOARDING_ID,
   createDemoGuidedOnboarding,
+  normalizeGuidedInstance,
   recomputeInstanceState,
   withUpdatedStep,
   type OnboardingInstance,
   type StepResponse,
 } from "@/lib/onboarding-steps";
-import {
-  listGuidedInstances,
-  upsertGuidedInstance,
-  type StoredGuidedInstance,
-} from "@/lib/supabase/guided-repository";
+import type { StoredGuidedInstance } from "@/lib/supabase/guided-repository";
 
 interface GuidedOnboardingContextValue {
   instances: StoredGuidedInstance[];
@@ -40,6 +37,8 @@ interface GuidedOnboardingContextValue {
 
 const GuidedOnboardingContext = createContext<GuidedOnboardingContextValue | null>(null);
 
+const GUIDED_STORAGE_KEY = "onboarding-app.guided-instances.v1";
+
 function asStored(instance: OnboardingInstance): StoredGuidedInstance {
   return instance as StoredGuidedInstance;
 }
@@ -51,31 +50,43 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     let active = true;
-    listGuidedInstances()
-      .then((rows) => {
-        if (!active) return;
-        setInstances(rows);
-        setError("");
-      })
-      .catch((loadError: unknown) => {
-        if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Kunde inte ladda guidningar.");
-      })
-      .finally(() => {
+
+    Promise.resolve().then(() => {
+      try {
+        const raw = window.localStorage.getItem(GUIDED_STORAGE_KEY);
+        const saved = raw ? JSON.parse(raw) : [];
+        const rows = Array.isArray(saved)
+          ? saved.map((instance) => normalizeGuidedInstance(instance)).map(asStored)
+          : [];
+        if (active) {
+          setInstances(rows);
+          setError("");
+        }
+      } catch (loadError: unknown) {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : "Kunde inte ladda guidningen.");
+        }
+      } finally {
         if (active) setIsHydrated(true);
-      });
+      }
+    });
+
     return () => {
       active = false;
     };
   }, []);
 
   const persist = useCallback((instance: StoredGuidedInstance) => {
-    setInstances((current) => [
-      instance,
-      ...current.filter((existing) => existing.id !== instance.id),
-    ]);
-    void upsertGuidedInstance(instance).catch((saveError: unknown) => {
-      setError(saveError instanceof Error ? saveError.message : "Kunde inte spara guidningen.");
+    const normalized = asStored(normalizeGuidedInstance(instance));
+    setInstances((current) => {
+      const next = [normalized, ...current.filter((existing) => existing.id !== normalized.id)];
+      try {
+        window.localStorage.setItem(GUIDED_STORAGE_KEY, JSON.stringify(next));
+        setError("");
+      } catch (saveError: unknown) {
+        setError(saveError instanceof Error ? saveError.message : "Kunde inte spara guidningen.");
+      }
+      return next;
     });
   }, []);
 
