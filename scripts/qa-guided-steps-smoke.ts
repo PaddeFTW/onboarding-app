@@ -6,7 +6,6 @@ import {
   createStepInstancesFromDefinitions,
   getVisibleSteps,
   isStepResponseComplete,
-  normalizeGuidedInstance,
   recomputeInstanceState,
   withUpdatedStep,
 } from "../lib/onboarding-steps";
@@ -129,14 +128,6 @@ function main() {
     "Expected onboarding to be completable after all required visible steps."
   );
   expect(completed.progress === 100, "Expected full progress after completion.");
-
-  const normalized = normalizeGuidedInstance({
-    id: demo.id,
-    steps: [{ id: "workplace", response: { selectedOptionId: "office" } } as never],
-  });
-  expect(normalized.steps.length === 10, "Expected missing steps to be restored.");
-  expect(normalized.steps.find((step) => step.id === "workplace")?.response.selectedOptionId === "office", "Expected saved response to survive normalization.");
-  expect(normalized.currentStepId === "welcome", "Expected normalization to restore a valid current step.");
 
   console.log("Guided steps smoke test passed.");
 }

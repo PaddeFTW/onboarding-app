@@ -34,8 +34,8 @@ export default function DocumentWorkspacePage() {
 
   function draft(item: NonNullable<typeof selected>, id: string) {
     const current = item.steps.find((entry) => entry.id === id);
-    const knowledgeModule = knowledgeForStep(id);
-    return [`${item.title}`, `Moment: ${current?.title ?? ""}`, knowledgeModule ? `Modul: ${knowledgeModule.module}` : "", knowledgeModule?.text ?? "", current?.content ?? ""].filter(Boolean).join("\n\n");
+    const module = knowledgeForStep(id);
+    return [`${item.title}`, `Moment: ${current?.title ?? ""}`, module ? `Modul: ${module.module}` : "", module?.text ?? "", current?.content ?? ""].filter(Boolean).join("\n\n");
   }
 
   async function chooseStep(nextInstanceId: string, nextStepId: string) {
