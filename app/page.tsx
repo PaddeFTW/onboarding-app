@@ -1,56 +1,61 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { PageContainer } from "@/components/page-container";
-import { SectionHeader } from "@/components/section-header";
-import { EmptyState } from "@/components/empty-state";
-import { LoadingState } from "@/components/loading-state";
 import { Button } from "@/components/ui/button";
-import { OnboardingCard } from "@/components/onboarding/OnboardingCard";
-import { useOnboardingStore } from "@/components/providers/onboarding-provider";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-
-const links = [
-  ["/dokument-workspace", "Dokument"],
-  ["/moduler", "Moduler"],
-  ["/kundtest", "Kundtest"],
-  ["/dokument", "Filer"],
-  ["/historik", "Historik"],
-  ["/ordlista", "Ordlista"],
-  ["/policyer", "Policyer"],
-  ["/installera", "Installera"],
-];
+import { listGuidedInstances } from "@/lib/supabase/guided-repository";
 
 export default function HomePage() {
-  const { ongoingOnboardings, completedOnboardings, isLoading, error, refreshOnboardings } = useOnboardingStore();
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof listGuidedInstances>>>([]);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    void listGuidedInstances().then((items) => {
+      setRows(items);
+      setReady(true);
+    }).catch(() => setReady(true));
+  }, []);
+
+  const current = rows.find((item) => item.status !== "completed") ?? rows[0];
 
   return (
-    <PageContainer className="relative flex flex-col gap-14 overflow-hidden sm:gap-16">
-      <header className="relative flex flex-col gap-6 sm:gap-7">
-        <div className="flex flex-col gap-2.5">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-primary/60">Onboarding</p>
-          <h1 className="max-w-[10ch] text-[2.3rem] font-semibold tracking-tight sm:max-w-none sm:text-5xl">Välkommen tillbaka.</h1>
-          <p className="max-w-[34ch] text-base leading-relaxed text-muted-foreground sm:text-lg">Hantera och följ upp dina medarbetares onboarding-program.</p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button size="lg" className="w-full sm:w-fit" asChild><Link href="/onboarding/new"><Plus />Ny onboarding</Link></Button>
-          <Button size="lg" variant="outline" className="w-full sm:w-fit" asChild><Link href="/onboarding/templates">Företagsmallar</Link></Button>
-          <Button size="lg" variant="outline" className="w-full sm:w-fit" asChild><Link href="/inbjudan">Bjud in</Link></Button>
+    <PageContainer className="flex flex-col gap-8">
+      <header className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Arbetsyta</p>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight">Fortsätt onboardingen</h1>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">Här ser du vad som ska göras, vad du behöver veta och vad som hänt. Guidningen är arbetsytan.</p>
+          </div>
           <SignOutButton />
         </div>
-        <nav className="flex flex-wrap gap-3 text-sm">
-          {links.map(([href, label]) => <Link key={href} className="font-medium text-[#5b4dff]" href={href}>{label}</Link>)}
-        </nav>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild><Link href="/onboarding/new"><Plus />Ny onboarding</Link></Button>
+          <Button variant="outline" asChild><Link href="/installningar">Inställningar</Link></Button>
+        </div>
       </header>
-      <section className="flex flex-col gap-5">
-        <SectionHeader title="Pågående" description={ongoingOnboardings.length > 0 ? `${ongoingOnboardings.length} pågår` : undefined} />
-        {isLoading ? <LoadingState variant="cards" count={2} /> : error ? <EmptyState title="Kunde inte ladda onboardingar" description={error} action={<Button onClick={() => void refreshOnboardings()}>Försök igen</Button>} /> : ongoingOnboardings.length === 0 ? <EmptyState title="Inga pågående onboardingar" description="Starta en ny onboarding för att komma igång." /> : <div className="flex flex-col gap-3">{ongoingOnboardings.map((o, i) => <OnboardingCard key={o.id} onboarding={o} index={i} />)}</div>}
+
+      <section className="rounded-3xl border bg-primary/5 p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">Vad behöver jag göra?</p>
+        {!ready ? <p className="mt-3 text-sm">Laddar…</p> : current ? (
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">{current.title}</h2>
+              <p className="text-sm text-muted-foreground">{current.participantName} · {current.progress}% klart</p>
+            </div>
+            <Button asChild><Link href={`/onboarding/guided/${current.id}`}>Öppna guidningen</Link></Button>
+          </div>
+        ) : <p className="mt-3 text-sm">Ingen pågående onboarding. Starta en ny.</p>}
       </section>
-      <section className="flex flex-col gap-5">
-        <SectionHeader title="Slutförda" description={completedOnboardings.length > 0 ? `${completedOnboardings.length} genomförda` : undefined} />
-        {isLoading ? <LoadingState variant="cards" count={1} /> : completedOnboardings.length === 0 ? <EmptyState title="Inga slutförda onboardingar ännu" description="Slutförda onboardingar visas här när alla punkter är genomförda." /> : <div className="flex flex-col gap-3">{completedOnboardings.map((o, i) => <OnboardingCard key={o.id} onboarding={o} index={i} />)}</div>}
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Link className="rounded-2xl border p-4" href="/moduler"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad behöver jag veta?</p><p className="mt-2 font-semibold">Moduler</p></Link>
+        <Link className="rounded-2xl border p-4" href="/policyer"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Policyer</p><p className="mt-2 font-semibold">Företagets regler</p></Link>
+        <Link className="rounded-2xl border p-4" href="/historik"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad har hänt?</p><p className="mt-2 font-semibold">Historik</p></Link>
       </section>
     </PageContainer>
   );

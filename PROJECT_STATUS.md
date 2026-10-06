@@ -2,13 +2,14 @@
 
 ## Aktuellt
 
-Production fungerar igen efter att Del 2-mergen backades. Live: https://onboarding-app-black.vercel.app/
+Live: https://onboarding-app-black.vercel.app/
 
-Finns i main: inloggning, företag, roller och inbjudan, mallar, guidning, kunskapsmoduler i momentet, dokument per moment, Word/PDF, historik, ordlista, policyöversikt, integritet och villkor.
+Startsidan är arbetsytan. Den öppnar pågående guidning. Mallar ligger under Inställningar.
 
-Del 2 med localStorage-resume ligger kvar i grenen v0/guided-onboarding-local-state. Den ska inte mergas igen förrän en deploy har testats utan att middleware kraschar.
+Finns: inloggning, företag, inbjudan, mallversion, guidning, moduler, dokument, export, historik, ordlista, policyöversikt.
 
-## Kvar
+## Ord
 
-- Köra kundtestet inloggad: mall, guidning, dokument, export.
-- En exe utan internet ingår inte. Installera via Edge eller Chrome.
+- Arbetsyta: startsidan, ingången.
+- Guidning: momenten som ska göras.
+- Mallar: admin för vilka moment som ingår. Inte arbetsytan.
