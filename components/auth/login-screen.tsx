@@ -21,7 +21,7 @@ export function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<Mode>("link");
+  const [mode, setMode] = useState<Mode>("password");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
