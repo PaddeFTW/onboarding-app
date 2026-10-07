@@ -11,7 +11,7 @@ export default function ModulerPage() {
       {knowledgeModules.map((item) => (
         <article key={item.stepId} className="rounded-2xl border px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-[#5b4dff]">{item.module}</p>
-          <h2 className="mt-1 font-semibold">{item.stepId}</h2>
+          <h2 className="mt-1 font-semibold">{item.title}</h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">{item.text}</p>
         </article>
       ))}

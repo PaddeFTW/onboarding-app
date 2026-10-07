@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { downloadOnboardingPdf, uploadStepDocument } from "@/lib/documents";
+import { swedishStepStatus } from "@/lib/knowledge-modules";
 import { listGuidedInstances } from "@/lib/supabase/guided-repository";
 
 export default function DokumentPage() {
@@ -57,7 +58,7 @@ export default function DokumentPage() {
         <input name="file" type="file" required />
         <Button className="h-12 rounded-full bg-[#6d4dff]" type="submit">Ladda upp till momentet</Button>
       </form>
-      <Button type="button" variant="outline" onClick={() => selected && downloadOnboardingPdf({ title: selected.title, participant: selected.participantName, lines: selected.steps.map((step) => `${step.title}: ${step.status}`) })}>Ladda ner PDF</Button>
+      <Button type="button" variant="outline" onClick={() => selected && downloadOnboardingPdf({ title: selected.title, participant: selected.participantName, lines: selected.steps.map((step) => `${step.title}: ${swedishStepStatus(step.status)}`) })}>Ladda ner PDF</Button>
     </main>
   );
 }
