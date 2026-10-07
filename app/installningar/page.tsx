@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const items = [
+  ["/register", "Företagsregister", "Bransch, befattningar och medarbetare."],
   ["/onboarding/templates", "Mallar", "Företagets version av momenten. Publicera innan en onboarding startas."],
   ["/inbjudan", "Bjud in", "Lägg till en kollega i företaget."],
   ["/dokument-workspace", "Dokument", "Öppna en onboarding som text och exportera."],

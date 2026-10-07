@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 import { useOnboardingStore } from "@/components/providers/onboarding-provider";
 
 export function NewOnboardingForm() {
@@ -21,6 +22,15 @@ export function NewOnboardingForm() {
     []
   );
 
+  const [people, setPeople] = React.useState<Array<{ id: string; name: string; position: string; can_manage: boolean; can_mentor: boolean }>>([]);
+  React.useEffect(() => {
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from("employees").select("id,name,can_manage,can_mentor,positions(name)");
+      setPeople((data ?? []).map((item) => ({ id: item.id, name: item.name, position: item.positions?.name ?? "", can_manage: item.can_manage, can_mentor: item.can_mentor })));
+    })();
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -28,18 +38,17 @@ export function NewOnboardingForm() {
 
     try {
       const formData = new FormData(e.currentTarget as HTMLFormElement);
-      const manager = String(formData.get("manager") ?? "").trim();
-
-      if (!manager) {
-        throw new Error("Ange ansvarig chef.");
-      }
-
+      const employee = people.find((item) => item.id === String(formData.get("employeeId") ?? ""));
+      const manager = people.find((item) => item.id === String(formData.get("managerId") ?? ""));
+      const mentor = people.find((item) => item.id === String(formData.get("mentorId") ?? ""));
+      if (!employee || !manager || !mentor) throw new Error("Välj medarbetare, ansvarig chef och mentor.");
+      const [firstName, ...rest] = employee.name.split(" ");
       const onboardingId = await createOnboarding({
-        firstName: String(formData.get("firstName") ?? ""),
-        lastName: String(formData.get("lastName") ?? ""),
+        firstName,
+        lastName: rest.join(" ") || "-",
         startDate: String(formData.get("startDate") ?? ""),
-        position: String(formData.get("position") ?? ""),
-        manager,
+        position: employee.position,
+        manager: `${manager.name} · mentor ${mentor.name}`,
       });
 
       router.push(`/onboarding/${onboardingId}`);
@@ -70,6 +79,12 @@ export function NewOnboardingForm() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Medarbetare" htmlFor="employeeId">
+              <select id="employeeId" name="employeeId" required className="h-12 w-full rounded-full border px-4">
+                <option value="">Välj medarbetare</option>
+                {people.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.position}</option>)}
+              </select>
+            </Field>
             <Field label="Förnamn" htmlFor="firstName">
               <Input
                 id="firstName"
