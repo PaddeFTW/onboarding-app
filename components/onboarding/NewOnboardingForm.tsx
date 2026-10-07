@@ -43,15 +43,21 @@ export function NewOnboardingForm() {
       const mentor = people.find((item) => item.id === String(formData.get("mentorId") ?? ""));
       if (!employee || !manager || !mentor) throw new Error("Välj medarbetare, ansvarig chef och mentor.");
       const [firstName, ...rest] = employee.name.split(" ");
-      const onboardingId = await createOnboarding({
+      await createOnboarding({
         firstName,
         lastName: rest.join(" ") || "-",
         startDate: String(formData.get("startDate") ?? ""),
         position: employee.position,
         manager: `${manager.name} · mentor ${mentor.name}`,
       });
-
-      router.push(`/onboarding/${onboardingId}`);
+      const guided = createCompanyGuidedOnboarding({
+        participantName: employee.name,
+        managerName: manager.name,
+        mentorName: mentor.name,
+        position: employee.position,
+      });
+      await upsertGuidedInstance(guided);
+      router.push(`/onboarding/guided/${guided.id}`);
     } catch (submitError) {
       const message =
         submitError instanceof Error

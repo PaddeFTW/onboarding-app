@@ -236,6 +236,25 @@ export function createStepInstancesFromDefinitions(
   }));
 }
 
+
+export function createCompanyGuidedOnboarding(input: { participantName: string; managerName: string; mentorName: string; position: string }) {
+  const steps = createStepInstancesFromDefinitions(BUILD_CO_STEP_DEFINITIONS);
+  const visible = getVisibleSteps({ steps } as OnboardingInstance);
+  return {
+    id: crypto.randomUUID(),
+    title: `Introduktion — ${input.participantName}`,
+    participantName: input.participantName,
+    responsibleName: `${input.managerName} · mentor ${input.mentorName}`,
+    status: "ongoing" as const,
+    currentStepId: visible[0]?.id ?? null,
+    progress: 0,
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    steps,
+    templateLabel: input.position,
+  };
+}
+
 export function createDemoGuidedOnboarding(): OnboardingInstance {
   const steps = createStepInstancesFromDefinitions(BUILD_CO_STEP_DEFINITIONS);
   const visible = getVisibleSteps({ steps } as OnboardingInstance);

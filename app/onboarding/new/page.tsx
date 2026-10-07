@@ -18,8 +18,8 @@ export default function NewOnboardingPage() {
 
       <SectionHeader
         size="page"
-        title="Ny onboarding"
-        description="Fyll i uppgifterna nedan för att starta ett nytt onboarding-program."
+        title="Ny introduktion"
+        description="Välj medarbetare, chef och mentor. Introduktionen startar direkt."
       />
 
       <NewOnboardingForm />
