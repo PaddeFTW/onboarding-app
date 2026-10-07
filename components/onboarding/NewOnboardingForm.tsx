@@ -73,11 +73,11 @@ export function NewOnboardingForm() {
               Grunduppgifter
             </p>
             <p className="max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
-              Ange medarbetarens grunduppgifter. Checklistan skapas automatiskt
-              när onboardingen startas.
+              Välj medarbetare, ansvarig chef och mentor. Befattningen följer med.
             </p>
           </div>
 
+          {people.length === 0 ? <p className="text-sm">Lägg först in medarbetare i <a className="font-semibold text-[#5b4dff]" href="/register">företagsregistret</a>.</p> : null}
           <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Medarbetare" htmlFor="employeeId">
               <select id="employeeId" name="employeeId" required className="h-12 w-full rounded-full border px-4">
@@ -85,62 +85,24 @@ export function NewOnboardingForm() {
                 {people.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.position}</option>)}
               </select>
             </Field>
-            <Field label="Förnamn" htmlFor="firstName">
-              <Input
-                id="firstName"
-                name="firstName"
-                placeholder="Förnamn"
-                required
-                disabled={loading}
-                autoComplete="given-name"
-              />
-            </Field>
-            <Field label="Efternamn" htmlFor="lastName">
-              <Input
-                id="lastName"
-                name="lastName"
-                placeholder="Efternamn"
-                required
-                disabled={loading}
-                autoComplete="family-name"
-              />
-            </Field>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Startdatum" htmlFor="startDate">
-              <Input
-                id="startDate"
-                name="startDate"
-                type="date"
-                defaultValue={defaultStartDate}
-                required
-                disabled={loading}
-              />
-            </Field>
-
-            <Field label="Befattning" htmlFor="position">
-              <Input
-                id="position"
-                name="position"
-                placeholder="Befattning"
-                required
-                disabled={loading}
-                autoComplete="organization-title"
-              />
+              <Input id="startDate" name="startDate" type="date" defaultValue={defaultStartDate} required disabled={loading} />
             </Field>
           </div>
-
-          <Field label="Ansvarig chef" htmlFor="manager">
-            <Input
-              id="manager"
-              name="manager"
-              placeholder="Ansvarig chef"
-              required
-              disabled={loading}
-              autoComplete="name"
-            />
-          </Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Ansvarig chef" htmlFor="managerId">
+              <select id="managerId" name="managerId" required className="h-12 w-full rounded-full border px-4">
+                <option value="">Välj chef</option>
+                {people.filter((item) => item.can_manage).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Mentor" htmlFor="mentorId">
+              <select id="mentorId" name="mentorId" required className="h-12 w-full rounded-full border px-4">
+                <option value="">Välj mentor</option>
+                {people.filter((item) => item.can_mentor).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </Field>
+          </div>
 
           {error ? (
             <p className="text-sm text-destructive">{error}</p>
