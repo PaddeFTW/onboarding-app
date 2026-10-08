@@ -40,14 +40,14 @@ export default function HomePage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Arbetsyta</p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight">{current ? "Fortsätt onboardingen" : "Starta introduktionen"}</h1>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight">{current ? "Fortsätt introduktionen" : "Starta introduktionen"}</h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">{current ? "Här ser du nästa steg i introduktionen." : "Välj medarbetare, ansvarig chef och mentor. Frågorna öppnas direkt."}</p>
           </div>
           <SignOutButton />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild><Link href="/onboarding/new"><Plus />Ny onboarding</Link></Button>
-          <Button variant="outline" asChild><Link href="/installningar">Inställningar</Link></Button>
+          <Button asChild><Link href="/register">Företaget</Link></Button>
+          <Button variant="outline" asChild><Link href="/onboarding/new"><Plus />Ny introduktion</Link></Button>
         </div>
       </header>
 
@@ -64,8 +64,8 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">Välj medarbetare, ansvarig chef och mentor. Frågorna öppnas direkt.</p>
-            <Button asChild><Link href="/onboarding/new"><Plus data-icon="inline-start" />Ny introduktion</Link></Button>
+            <p className="text-sm text-muted-foreground">Lägg först in företaget, medarbetarna och vem som kan vara chef eller mentor. Sedan startar du introduktionen.</p>
+            <Button variant="outline" asChild><Link href="/register">Öppna företagsregistret</Link></Button>
           </div>
         )}
       </section>
