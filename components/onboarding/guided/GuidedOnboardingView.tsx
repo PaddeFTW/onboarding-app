@@ -81,6 +81,22 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   const [resetOpen, setResetOpen] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [stepDrafts, setStepDrafts] = useState<Record<string, StepResponse>>({});
+  const [companyContext, setCompanyContext] = useState<{ industry: string; employeeCount: string; facts: Record<string, unknown> }>({ industry: "general", employeeCount: "", facts: {} });
+
+  useEffect(() => {
+    void (async () => {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: user } = await supabase.auth.getUser();
+      const { data: member } = await supabase.from("organization_members").select("organization_id").eq("user_id", user.user?.id).limit(1).maybeSingle();
+      if (!member?.organization_id) return;
+      const [{ data: settings }, { data: facts }] = await Promise.all([
+        supabase.from("company_settings").select("industry,employee_count").eq("organization_id", member.organization_id).maybeSingle(),
+        supabase.from("company_facts").select("work_hours,sick_contact,safety_rep,policies,has_alarm,follow_up_days").eq("organization_id", member.organization_id).maybeSingle(),
+      ]);
+      setCompanyContext({ industry: settings?.industry ?? "general", employeeCount: settings?.employee_count ?? "", facts: facts ?? {} });
+    })();
+  }, []);
 
   useEffect(() => {
     if (isHydrated && id === DEMO_GUIDED_ONBOARDING_ID) {
@@ -281,7 +297,7 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
           </p>
         </div>
 
-        <StepContent step={activeStep} response={draftResponse} onChange={handleDraftChange} />
+        <StepContent step={activeStep} response={draftResponse} onChange={handleDraftChange} industry={companyContext.industry} employeeCount={companyContext.employeeCount} facts={companyContext.facts} />
 
         {activeStep.helpText ? (
           <p className="rounded-2xl border border-border/80 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
@@ -361,10 +377,16 @@ function StepContent({
   step,
   response,
   onChange,
+  industry,
+  employeeCount,
+  facts,
 }: {
   step: OnboardingStepInstance;
   response: StepResponse;
   onChange: (partial: StepResponse) => void;
+  industry: string;
+  employeeCount: string;
+  facts: Record<string, unknown>;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -382,11 +404,22 @@ function StepContent({
           <p className="mt-2 leading-relaxed text-neutral-600">{questionById(step.id)?.helpText}</p>
         </details>
       ) : step.helpText ? <p className="text-sm leading-relaxed text-neutral-600">{step.helpText}</p> : null}
-      {exampleFor(step.id, "general") ? <p className="text-sm text-neutral-500">Exempel: {exampleFor(step.id, "general")}</p> : null}
+      {exampleFor(step.id, industry) ? <p className="text-sm text-neutral-500">Exempel: {shortExample(exampleFor(step.id, industry), employeeCount)}</p> : null}
 
-      {renderStepInteraction(step, response, onChange)}
+      {renderStepInteraction(step, { ...response, comment: response.comment ?? savedFactFor(step.id, facts) }, onChange)}
     </div>
   );
+}
+
+function savedFactFor(stepId: string, facts: Record<string, unknown>) {
+  const keys: Record<string, string> = { hours: "work_hours", safety: "safety_rep", policy: "policies", alarm: "has_alarm", followup: "follow_up_days" };
+  const value = facts[keys[stepId]];
+  return value == null || value === "" ? undefined : String(value);
+}
+
+function shortExample(value: string, employeeCount: string) {
+  if (employeeCount !== "1–5") return value;
+  return value.replace(/[^.!?]+(ansvarig|ansvariga|chef)[^.!?]*[.!?]?/gi, "").replace(/\s{2,}/g, " ").trim() || value;
 }
 
 function renderStepInteraction(

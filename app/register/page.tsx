@@ -14,6 +14,7 @@ type Employee = { id: string; name: string; position_id: string; can_manage: boo
 export default function RegisterPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [industry, setIndustry] = useState("construction");
+  const [employeeCount, setEmployeeCount] = useState("1–5");
   const [positions, setPositions] = useState<Position[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [name, setName] = useState("");
@@ -28,8 +29,9 @@ export default function RegisterPage() {
     const { data: member } = await supabase.from("organization_members").select("organization_id").eq("user_id", user.user?.id).limit(1).maybeSingle();
     if (!member) return;
     setOrgId(member.organization_id);
-    const { data: settings } = await supabase.from("company_settings").select("industry").eq("organization_id", member.organization_id).maybeSingle();
+    const { data: settings } = await supabase.from("company_settings").select("industry,employee_count").eq("organization_id", member.organization_id).maybeSingle();
     if (settings?.industry) setIndustry(settings.industry);
+    if (settings?.employee_count) setEmployeeCount(settings.employee_count);
     const { data: positionRows } = await supabase.from("positions").select("id,name,role").eq("organization_id", member.organization_id);
     setPositions(positionRows ?? []);
     const { data: employeeRows } = await supabase.from("employees").select("id,name,position_id,can_manage,can_mentor").eq("organization_id", member.organization_id);
@@ -41,7 +43,7 @@ export default function RegisterPage() {
   async function saveIndustry() {
     if (!orgId) return;
     const supabase = createClient();
-    await supabase.from("company_settings").upsert({ organization_id: orgId, industry });
+    await supabase.from("company_settings").upsert({ organization_id: orgId, industry, employee_count: employeeCount });
     const suggestions = industryById(industry)?.positions ?? [];
     if (positions.length === 0) {
       await supabase.from("positions").insert(suggestions.map(([name, role]) => ({ organization_id: orgId, name, role })));
@@ -70,7 +72,12 @@ export default function RegisterPage() {
           {industries.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>
-      <Button className="h-12 w-fit rounded-full" onClick={() => void saveIndustry()}>Spara bransch</Button>
+      <label className="text-sm">Antal anställda
+        <select className="mt-1 h-12 w-full rounded-full border px-4" value={employeeCount} onChange={(event) => setEmployeeCount(event.target.value)}>
+          {['1–5', '6–20', '21–50', '51–250', '250+'].map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </label>
+      <Button className="h-12 w-fit rounded-full" onClick={() => void saveIndustry()}>Spara företagsuppgifter</Button>
       <section className="rounded-2xl border p-4">
         <h2 className="font-semibold">Befattningar</h2>
         {positions.length === 0 ? <p className="mt-2 text-sm text-neutral-500">Spara branschen för att få förslag.</p> : positions.map((item) => <p key={item.id} className="mt-1 text-sm">{item.name} · {item.role}</p>)}

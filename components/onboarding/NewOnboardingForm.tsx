@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +10,8 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { createCompanyGuidedOnboarding } from "@/lib/onboarding-steps";
+import { upsertGuidedInstance } from "@/lib/supabase/guided-repository";
 import { useOnboardingStore } from "@/components/providers/onboarding-provider";
 
 export function NewOnboardingForm() {
@@ -27,7 +29,7 @@ export function NewOnboardingForm() {
     void (async () => {
       const supabase = createClient();
       const { data } = await supabase.from("employees").select("id,name,can_manage,can_mentor,positions(name)");
-      setPeople((data ?? []).map((item) => ({ id: item.id, name: item.name, position: item.positions?.name ?? "", can_manage: item.can_manage, can_mentor: item.can_mentor })));
+      setPeople((data ?? []).map((item) => ({ id: item.id, name: item.name, position: Array.isArray(item.positions) ? (item.positions[0] as { name?: string } | undefined)?.name ?? "" : "", can_manage: item.can_manage, can_mentor: item.can_mentor })));
     })();
   }, []);
 
