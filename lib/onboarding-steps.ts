@@ -238,7 +238,8 @@ export function createStepInstancesFromDefinitions(
 
 
 export function createCompanyGuidedOnboarding(input: { participantName: string; managerName: string; mentorName: string; position: string }) {
-  const steps = createStepInstancesFromDefinitions(BUILD_CO_STEP_DEFINITIONS);
+  const { introductionQuestions } = require("@/lib/introduction-questions") as { introductionQuestions: OnboardingStepDefinition[] };
+  const steps = createStepInstancesFromDefinitions(introductionQuestions);
   const visible = getVisibleSteps({ steps } as OnboardingInstance);
   return {
     id: crypto.randomUUID(),

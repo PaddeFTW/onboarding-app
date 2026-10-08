@@ -375,13 +375,8 @@ function StepContent({
         </div>
       ) : null}
 
-      {knowledgeForStep(step.id) ? (
-        <div className="rounded-[1.35rem] border border-primary/15 bg-primary/5 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary/80">{knowledgeForStep(step.id)?.module}</p>
-          <p className="mt-2 text-sm leading-relaxed">{knowledgeForStep(step.id)?.text}</p>
-          <Link className="mt-3 inline-block text-sm font-semibold text-primary" href="/dokument-workspace">Öppna momentet som dokument</Link>
-        </div>
-      ) : null}
+      {step.helpText ? <p className="text-sm leading-relaxed text-neutral-600">{step.helpText}</p> : null}
+      {step.content ? <p className="text-sm text-neutral-500">{step.content}</p> : null}
 
       {renderStepInteraction(step, response, onChange)}
     </div>
