@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { OnboardingProvider } from "@/components/providers/onboarding-provider";
+import { GuidedOnboardingProvider } from "@/components/providers/guided-onboarding-provider";
 import { Installer } from "@/components/installer";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -19,9 +20,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="sv" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full bg-background text-foreground">
         <OnboardingProvider>
-          {children}
-          <Toaster />
-          <Installer />
+          <GuidedOnboardingProvider>
+            {children}
+            <Toaster />
+            <Installer />
+          </GuidedOnboardingProvider>
         </OnboardingProvider>
       </body>
     </html>
