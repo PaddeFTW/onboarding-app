@@ -99,6 +99,7 @@ export default function RegisterPage() {
       <p className="text-sm text-neutral-500">Bransch, befattningar och medarbetare. Ny introduktion väljer härifrån.</p>
       <label className="text-sm">Bransch
         <select className="mt-1 h-12 w-full rounded-full border px-4" value={industry} onChange={(event) => setIndustry(event.target.value)}>
+          <option value="">Välj bransch</option>
           {industries.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>
@@ -111,12 +112,27 @@ export default function RegisterPage() {
         <h2 className="font-semibold">Uppgifter som kan återanvändas</h2>
         <Input placeholder="Arbetstider" value={facts.work_hours} onChange={(event) => setFacts((current) => ({ ...current, work_hours: event.target.value }))} />
         <Input placeholder="Vem ringer man vid sjukdom?" value={facts.sick_contact} onChange={(event) => setFacts((current) => ({ ...current, sick_contact: event.target.value }))} />
-        <Input placeholder="Skyddsombud, eller saknas" value={facts.safety_rep} onChange={(event) => setFacts((current) => ({ ...current, safety_rep: event.target.value }))} />
-        <Input placeholder="Policyer" value={facts.policies} onChange={(event) => setFacts((current) => ({ ...current, policies: event.target.value }))} />
+        <select className="h-12 rounded-full border px-4" value={facts.safety_rep} onChange={(event) => setFacts((current) => ({ ...current, safety_rep: event.target.value }))}>
+          <option value="">Skyddsombud</option>
+          <option value="Skyddsombud saknas">Skyddsombud saknas</option>
+          <option value="Chefen är skyddsombud">Chefen är skyddsombud</option>
+          <option value="Skyddsombud är utsett">Skyddsombud är utsett</option>
+        </select>
+        <select className="h-12 rounded-full border px-4" value={facts.policies} onChange={(event) => setFacts((current) => ({ ...current, policies: event.target.value }))}>
+          <option value="">Policyer</option>
+          <option value="Inga policyer än">Inga policyer än</option>
+          <option value="Arbetsmiljö och kvalitet">Arbetsmiljö och kvalitet</option>
+          <option value="Arbetsmiljö, miljö och kvalitet">Arbetsmiljö, miljö och kvalitet</option>
+        </select>
         <select className="h-12 rounded-full border px-4" value={facts.has_alarm} onChange={(event) => setFacts((current) => ({ ...current, has_alarm: event.target.value }))}>
           <option value="">Larm (valfritt)</option><option value="Vi har inget larm">Vi har inget larm</option><option value="Vi har larm">Vi har larm</option>
         </select>
-        <Input type="number" min="1" placeholder="Uppföljning om antal dagar (valfritt)" value={facts.follow_up_days} onChange={(event) => setFacts((current) => ({ ...current, follow_up_days: event.target.value }))} />
+        <select className="h-12 rounded-full border px-4" value={facts.follow_up_days} onChange={(event) => setFacts((current) => ({ ...current, follow_up_days: event.target.value }))}>
+          <option value="">Uppföljning</option>
+          <option value="7">Efter 7 dagar</option>
+          <option value="14">Efter 14 dagar</option>
+          <option value="30">Efter 30 dagar</option>
+        </select>
       </section>
       <Button className="h-12 w-fit rounded-full" onClick={() => void saveIndustry()}>Spara företagsuppgifter</Button>
       <section className="rounded-2xl border p-4">

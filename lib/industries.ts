@@ -1,4 +1,5 @@
 export const industries = [
+  { id: "general", name: "Allmän verksamhet", positions: [["VD", "Ledning"], ["Ägare", "Ledning"], ["Arbetsledare", "Arbetsledning"], ["Administratör", "Administration"], ["Ekonom", "Administration"], ["Säljare", "Yrkesmedarbetare"], ["Yrkesmedarbetare", "Yrkesmedarbetare"], ["Lager", "Yrkesmedarbetare"]] },
   { id: "cleaning", name: "Städ och service", positions: [["Arbetsledare", "Arbetsledning"], ["Städare", "Yrkesmedarbetare"], ["Administratör", "Administration"], ["VD", "Ledning"]] },
   { id: "construction", name: "Bygg och entreprenad", positions: [["Platschef", "Arbetsledning"], ["Arbetsledare", "Arbetsledning"], ["Projektledare", "Projektledning"], ["Montör", "Yrkesmedarbetare"], ["Snickare", "Yrkesmedarbetare"], ["Administratör", "Administration"], ["VD", "Ledning"]] },
   { id: "electrical", name: "Elinstallation", positions: [["Arbetsledare", "Arbetsledning"], ["Elektriker", "Yrkesmedarbetare"], ["Serviceelektriker", "Yrkesmedarbetare"], ["Administratör", "Administration"], ["VD", "Ledning"]] },
