@@ -50,6 +50,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { knowledgeForStep } from "@/lib/knowledge-modules";
+import { exampleFor, questionById } from "@/lib/introduction-questions";
 import {
   Sheet,
   SheetBody,
@@ -375,8 +376,13 @@ function StepContent({
         </div>
       ) : null}
 
-      {step.helpText ? <p className="text-sm leading-relaxed text-neutral-600">{step.helpText}</p> : null}
-      {step.content ? <p className="text-sm text-neutral-500">{step.content}</p> : null}
+      {questionById(step.id) ? (
+        <details className="rounded-2xl border bg-white/70 px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-semibold text-[#0e7490]">Hjälp</summary>
+          <p className="mt-2 leading-relaxed text-neutral-600">{questionById(step.id)?.helpText}</p>
+        </details>
+      ) : step.helpText ? <p className="text-sm leading-relaxed text-neutral-600">{step.helpText}</p> : null}
+      {exampleFor(step.id, "general") ? <p className="text-sm text-neutral-500">Exempel: {exampleFor(step.id, "general")}</p> : null}
 
       {renderStepInteraction(step, response, onChange)}
     </div>
@@ -460,7 +466,7 @@ function renderStepInteraction(
               id={`task-comment-${step.id}`}
               value={response.comment ?? ""}
               onChange={(event) => onChange({ comment: event.target.value })}
-              placeholder="Kort anteckning om genomförd uppgift…"
+              placeholder={questionById(step.id)?.placeholder ?? "Skriv svaret"}
               className="min-h-24 resize-none"
             />
           </div>
