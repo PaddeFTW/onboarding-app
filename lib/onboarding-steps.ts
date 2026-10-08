@@ -1,3 +1,5 @@
+import { introductionQuestions } from "@/lib/introduction-questions";
+
 export type OnboardingStepType =
   | "information"
   | "confirmation"
@@ -238,7 +240,6 @@ export function createStepInstancesFromDefinitions(
 
 
 export function createCompanyGuidedOnboarding(input: { participantName: string; managerName: string; mentorName: string; position: string }) {
-  const { introductionQuestions } = require("@/lib/introduction-questions") as { introductionQuestions: OnboardingStepDefinition[] };
   const steps = createStepInstancesFromDefinitions(introductionQuestions);
   const visible = getVisibleSteps({ steps } as OnboardingInstance);
   return {
