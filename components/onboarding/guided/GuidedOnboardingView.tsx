@@ -406,13 +406,25 @@ function StepContent({
       ) : step.helpText ? <p className="text-sm leading-relaxed text-neutral-600">{step.helpText}</p> : null}
       {exampleFor(step.id, industry) ? <p className="text-sm text-neutral-500">Exempel: {shortExample(exampleFor(step.id, industry), employeeCount)}</p> : null}
 
-      {renderStepInteraction(step, { ...response, comment: response.comment ?? savedFactFor(step.id, facts) }, onChange)}
+      {renderStepInteraction(step, {
+        ...response,
+        selectedOptionId: response.selectedOptionId ?? (step.id === "alarm" && facts.has_alarm === "Vi har inget larm" ? "no-alarm" : undefined),
+        comment: response.comment ?? savedFactFor(step.id, facts),
+      }, onChange)}
     </div>
   );
 }
 
 function savedFactFor(stepId: string, facts: Record<string, unknown>) {
-  const keys: Record<string, string> = { hours: "work_hours", safety: "safety_rep", policy: "policies", alarm: "has_alarm", followup: "follow_up_days" };
+  if (stepId === "hours") {
+    const parts = [facts.work_hours, facts.sick_contact].filter((value) => value != null && value !== "");
+    return parts.length ? parts.join(". Sjuk anmäls till ") : undefined;
+  }
+  if (stepId === "followup") {
+    const days = facts.follow_up_days == null || facts.follow_up_days === "" ? 14 : facts.follow_up_days;
+    return `Uppföljning om ${days} dagar.`;
+  }
+  const keys: Record<string, string> = { safety: "safety_rep", policy: "policies", alarm: "has_alarm" };
   const value = facts[keys[stepId]];
   return value == null || value === "" ? undefined : String(value);
 }

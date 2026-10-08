@@ -127,7 +127,7 @@ export function NewOnboardingForm() {
           >
             Avbryt
           </Button>
-          <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={loading}>
+          <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={loading || people.length === 0}>
             {loading ? (
               <>
                 <Loader2 className="animate-spin" />
