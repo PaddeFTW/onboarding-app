@@ -110,25 +110,31 @@ export default function RegisterPage() {
       </label>
       <section className="flex flex-col gap-3 rounded-2xl border p-4">
         <h2 className="font-semibold">Uppgifter som kan återanvändas</h2>
-        <Input placeholder="Arbetstider" value={facts.work_hours} onChange={(event) => setFacts((current) => ({ ...current, work_hours: event.target.value }))} />
-        <Input placeholder="Vem ringer man vid sjukdom?" value={facts.sick_contact} onChange={(event) => setFacts((current) => ({ ...current, sick_contact: event.target.value }))} />
+        <label className="text-sm">Arbetstider
+          <Input className="mt-1" placeholder="Till exempel 07.00–16.00, eller schema" value={facts.work_hours} onChange={(event) => setFacts((current) => ({ ...current, work_hours: event.target.value }))} />
+          <span className="mt-1 block text-xs text-neutral-500">Skriv de tider som gäller hos er. Inte en lagtext.</span>
+        </label>
+        <label className="text-sm">Sjukanmälan
+          <Input className="mt-1" placeholder="Namn och nummer, före klockan 7" value={facts.sick_contact} onChange={(event) => setFacts((current) => ({ ...current, sick_contact: event.target.value }))} />
+          <span className="mt-1 block text-xs text-neutral-500">Vem man ringer, och när.</span>
+        </label>
         <select className="h-12 rounded-full border px-4" value={facts.safety_rep} onChange={(event) => setFacts((current) => ({ ...current, safety_rep: event.target.value }))}>
-          <option value="">Skyddsombud</option>
+          <option value="">Välj skyddsombud</option>
           <option value="Skyddsombud saknas">Skyddsombud saknas</option>
           <option value="Chefen är skyddsombud">Chefen är skyddsombud</option>
           <option value="Skyddsombud är utsett">Skyddsombud är utsett</option>
         </select>
         <select className="h-12 rounded-full border px-4" value={facts.policies} onChange={(event) => setFacts((current) => ({ ...current, policies: event.target.value }))}>
-          <option value="">Policyer</option>
+          <option value="">Välj vilka policyer som finns</option>
           <option value="Inga policyer än">Inga policyer än</option>
           <option value="Arbetsmiljö och kvalitet">Arbetsmiljö och kvalitet</option>
           <option value="Arbetsmiljö, miljö och kvalitet">Arbetsmiljö, miljö och kvalitet</option>
         </select>
         <select className="h-12 rounded-full border px-4" value={facts.has_alarm} onChange={(event) => setFacts((current) => ({ ...current, has_alarm: event.target.value }))}>
-          <option value="">Larm (valfritt)</option><option value="Vi har inget larm">Vi har inget larm</option><option value="Vi har larm">Vi har larm</option>
+          <option value="">Välj om lokalen har larm</option><option value="Vi har inget larm">Vi har inget larm</option><option value="Vi har larm">Vi har larm</option>
         </select>
         <select className="h-12 rounded-full border px-4" value={facts.follow_up_days} onChange={(event) => setFacts((current) => ({ ...current, follow_up_days: event.target.value }))}>
-          <option value="">Uppföljning</option>
+          <option value="">Välj när ni följer upp</option>
           <option value="7">Efter 7 dagar</option>
           <option value="14">Efter 14 dagar</option>
           <option value="30">Efter 30 dagar</option>
