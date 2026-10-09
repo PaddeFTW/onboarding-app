@@ -71,7 +71,7 @@ export default function HomePage() {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <Link className="rounded-2xl border p-4" href="/moduler"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad behöver jag veta?</p><p className="mt-2 font-semibold">Moduler</p></Link>
+        <Link className="rounded-2xl border p-4" href="/ordlista"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad betyder orden?</p><p className="mt-2 font-semibold">Kunskapsbank</p></Link>
         <Link className="rounded-2xl border p-4" href="/policyer"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Policyer</p><p className="mt-2 font-semibold">Företagets regler</p></Link>
         <Link className="rounded-2xl border p-4" href="/historik"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad har hänt?</p><p className="mt-2 font-semibold">Historik</p></Link>
       </section>
