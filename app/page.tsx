@@ -46,7 +46,7 @@ export default function HomePage() {
           <SignOutButton />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild><Link href="/register">Företaget</Link></Button>
+          <Button asChild><Link href="/foretaget">Företaget</Link></Button>
           <Button variant="outline" asChild><Link href="/onboarding/new"><Plus />Ny introduktion</Link></Button>
         </div>
       </header>
