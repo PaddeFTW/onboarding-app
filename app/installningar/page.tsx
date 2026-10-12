@@ -1,27 +1,42 @@
+"use client";
+
 import Link from "next/link";
 
-const items = [
-  ["/register", "Företagsregister", "Bransch, befattningar och medarbetare."],
-  ["/onboarding/templates", "Mallar", "Företagets version av momenten. Publicera innan en onboarding startas."],
-  ["/inbjudan", "Bjud in", "Lägg till en kollega i företaget."],
-  ["/dokument-workspace", "Dokument", "Öppna en onboarding som text och exportera."],
-  ["/dokument", "Filer", "Filer kopplade till ett moment."],
-  ["/ordlista", "Ordlista", "Orden appen använder."],
-  ["/installera", "Installera", "Lägg appen på datorn via webbläsaren."],
-];
+import { PageContainer } from "@/components/page-container";
+import { useLocale } from "@/components/providers/locale-provider";
 
 export default function InstallningarPage() {
+  const { t } = useLocale();
+  const items = [
+    ["/foretag", t("settings.overviewTitle"), t("settings.overviewText")],
+    ["/foretagsregister", t("settings.registryTitle"), t("settings.registryText")],
+    ["/medarbetare", t("employeesPage.title"), t("employeesPage.description")],
+    ["/register", t("settings.setupTitle"), t("settings.setupText")],
+    ["/onboarding/templates", t("settings.templatesTitle"), t("settings.templatesText")],
+    ["/inbjudan", t("settings.inviteTitle"), t("settings.inviteText")],
+    ["/dokument-workspace", t("settings.documentsTitle"), t("settings.documentsText")],
+    ["/dokument", t("settings.filesTitle"), t("settings.filesText")],
+    ["/ordlista", t("settings.glossaryTitle"), t("settings.glossaryText")],
+    ["/installera", t("settings.installTitle"), t("settings.installText")],
+  ] as const;
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-4 px-4 py-10">
-      <Link className="text-sm font-semibold text-[#5b4dff]" href="/">Tillbaka till arbetsytan</Link>
-      <h1 className="text-2xl font-semibold">Inställningar</h1>
-      <p className="text-sm text-neutral-500">Mallar och administration. Själva arbetet görs i guidningen.</p>
+    <PageContainer className="flex flex-col gap-4">
+      <Link className="text-sm font-semibold text-primary" href="/">
+        {t("common.backWorkspace")}
+      </Link>
+      <h1 className="text-2xl font-semibold">{t("settings.title")}</h1>
+      <p className="text-sm text-muted-foreground">{t("settings.description")}</p>
       {items.map(([href, title, text]) => (
-        <Link key={href} className="rounded-2xl border px-4 py-3" href={href}>
+        <Link
+          key={href}
+          className="rounded-2xl border border-border bg-card px-4 py-3 text-card-foreground"
+          href={href}
+        >
           <p className="font-semibold">{title}</p>
-          <p className="text-sm text-neutral-600">{text}</p>
+          <p className="text-sm text-muted-foreground">{text}</p>
         </Link>
       ))}
-    </main>
+    </PageContainer>
   );
 }

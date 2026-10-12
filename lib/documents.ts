@@ -22,6 +22,41 @@ export async function uploadStepDocument(input: { guidedInstanceId: string; step
   await recordEvent({ eventType: "document.uploaded", resourceType: "guided_instance", resourceId: input.guidedInstanceId, summary: `Laddade upp ${input.file.name}` });
 }
 
+/** Optional company-guide attachment. Uses existing documents table and storage. */
+export async function uploadCompanyGuideDocument(file: File) {
+  await uploadStepDocument({
+    guidedInstanceId: "foretagsguiden",
+    stepId: "dokument",
+    file,
+  });
+}
+
+/** Bilaga som hör till en persons introduktion, inte till hela företaget. */
+export async function uploadParticipantDocument(guidedInstanceId: string, file: File) {
+  await uploadStepDocument({
+    guidedInstanceId,
+    stepId: "personbilaga",
+    file,
+  });
+}
+
+export async function listParticipantDocuments(guidedInstanceId: string) {
+  try {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase
+      .from("onboarding_documents")
+      .select("id,title,created_at,step_id")
+      .eq("guided_instance_id", guidedInstanceId)
+      .eq("step_id", "personbilaga")
+      .order("created_at", { ascending: false });
+    if (error) return [];
+    return data ?? [];
+  } catch {
+    // Valfri bilagelista: saknad tabell eller behörighet ska inte krascha introduktionen.
+    return [];
+  }
+}
+
 export async function saveWorkspaceText(guidedInstanceId: string, text: string) {
   const supabase = getSupabaseBrowserClient();
   const companyId = await getCurrentCompanyId(supabase);

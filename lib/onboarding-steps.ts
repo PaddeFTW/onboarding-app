@@ -68,6 +68,10 @@ export interface OnboardingInstance {
   title: string;
   participantName: string;
   responsibleName: string;
+  managerName?: string;
+  mentorName?: string;
+  /** Anteckning som hör till denna persons introduktion. */
+  participantNote?: string;
   status: OnboardingInstanceStatus;
   currentStepId: string | null;
   progress: number;
@@ -239,14 +243,24 @@ export function createStepInstancesFromDefinitions(
 }
 
 
-export function createCompanyGuidedOnboarding(input: { participantName: string; managerName: string; mentorName: string; position: string }) {
+export function createCompanyGuidedOnboarding(input: {
+  participantName: string;
+  managerName: string;
+  mentorName: string;
+  position: string;
+  singleResponsible?: boolean;
+}) {
   const steps = createStepInstancesFromDefinitions(introductionQuestions);
   const visible = getVisibleSteps({ steps } as OnboardingInstance);
   return {
     id: crypto.randomUUID(),
     title: `Introduktion — ${input.participantName}`,
     participantName: input.participantName,
-    responsibleName: `${input.managerName} · mentor ${input.mentorName}`,
+    responsibleName: input.singleResponsible
+      ? input.managerName
+      : `${input.managerName} · mentor ${input.mentorName}`,
+    managerName: input.managerName,
+    mentorName: input.mentorName,
     status: "ongoing" as const,
     currentStepId: visible[0]?.id ?? null,
     progress: 0,
@@ -255,6 +269,42 @@ export function createCompanyGuidedOnboarding(input: { participantName: string; 
     steps,
     templateLabel: input.position,
   };
+}
+
+/** Parse chef/mentor from responsibleName when separate fields are missing. */
+export function responsibleNames(instance: Pick<OnboardingInstance, "responsibleName" | "managerName" | "mentorName">) {
+  if (instance.managerName) {
+    return {
+      managerName: instance.managerName,
+      mentorName: instance.mentorName || instance.managerName,
+    };
+  }
+  const match = instance.responsibleName.match(/^(.*?)\s*·\s*mentor\s+(.+)$/i);
+  if (match) {
+    return { managerName: match[1].trim(), mentorName: match[2].trim() };
+  }
+  return {
+    managerName: instance.responsibleName,
+    mentorName: instance.responsibleName,
+  };
+}
+
+/** Follow-up date for the receipt, from the saved answer or days ahead. */
+export function followUpDateLabel(instance: OnboardingInstance): string {
+  const followup = instance.steps.find((step) => step.id === "followup");
+  const comment = followup?.response.comment ?? "";
+  const iso = comment.match(/\d{4}-\d{2}-\d{2}/);
+  if (iso) return iso[0];
+  const swedish = comment.match(/\b(\d{4}-\d{2}-\d{2}|\d{1,2}[./]\d{1,2}[./]\d{2,4})\b/);
+  if (swedish) return swedish[1];
+  const daysMatch = comment.match(/(\d+)\s*dagar/i);
+  const days = daysMatch ? Number(daysMatch[1]) : 14;
+  const base = new Date(instance.completedAt || instance.startedAt);
+  if (Number.isNaN(base.getTime())) {
+    return new Date().toLocaleDateString("sv-SE");
+  }
+  base.setDate(base.getDate() + days);
+  return base.toLocaleDateString("sv-SE");
 }
 
 export function createDemoGuidedOnboarding(): OnboardingInstance {
@@ -322,9 +372,8 @@ export function applyStepVisibility(instance: OnboardingInstance): OnboardingIns
     ...instance,
     steps: instance.steps.map((step) => {
       if (visibleIds.has(step.id)) {
-        return step.status === "skipped"
-          ? { ...step, status: "notStarted" as StepStatus }
-          : step;
+        // Keep answered and user-skipped optional steps (friskvård, fack, larm).
+        return step;
       }
 
       return {
@@ -336,6 +385,18 @@ export function applyStepVisibility(instance: OnboardingInstance): OnboardingIns
       };
     }),
   };
+}
+
+export function isStepAnswered(step: OnboardingStepInstance): boolean {
+  return step.status === "completed" || step.status === "skipped";
+}
+
+/** First visible question that is not completed or skipped. */
+export function getFirstUnansweredStepId(
+  instance: OnboardingInstance
+): string | null {
+  const unanswered = getVisibleSteps(instance).find((step) => !isStepAnswered(step));
+  return unanswered?.id ?? null;
 }
 
 export function isStepResponseComplete(step: OnboardingStepInstance): boolean {
@@ -356,6 +417,11 @@ export function isStepResponseComplete(step: OnboardingStepInstance): boolean {
 export function countCompletedVisibleSteps(instance: OnboardingInstance): number {
   return getVisibleSteps(instance).filter((step) => step.status === "completed")
     .length;
+}
+
+/** Completed or skipped — used for "3 av 13". */
+export function countDoneVisibleSteps(instance: OnboardingInstance): number {
+  return getVisibleSteps(instance).filter((step) => isStepAnswered(step)).length;
 }
 
 export function calcGuidedProgress(instance: OnboardingInstance): number {
@@ -425,28 +491,27 @@ export function isStepAccessible(
     return false;
   }
 
-  const furthestIndex = visible.reduce((maxIndex, step, index) => {
-    if (step.status === "completed" || step.status === "inProgress") {
-      return Math.max(maxIndex, index);
-    }
-    return maxIndex;
-  }, 0);
+  const firstUnansweredIndex = visible.findIndex((step) => !isStepAnswered(step));
+  if (firstUnansweredIndex < 0) {
+    return true;
+  }
 
-  return targetIndex <= furthestIndex;
+  // Answered questions can be opened; nothing past the first unanswered.
+  return targetIndex <= firstUnansweredIndex;
 }
 
 export function getStepOverviewStatus(
   step: OnboardingStepInstance,
   currentStepId: string | null
 ): "completed" | "current" | "available" | "locked" | "skipped" {
+  if (step.id === currentStepId) {
+    return "current";
+  }
   if (step.status === "skipped") {
     return "skipped";
   }
   if (step.status === "completed") {
     return "completed";
-  }
-  if (step.id === currentStepId) {
-    return "current";
   }
   if (step.status === "inProgress") {
     return "available";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -10,30 +10,36 @@ import {
   CheckCircle2,
   ChevronRight,
   List,
+  Lock,
+  Paperclip,
   RotateCcw,
 } from "lucide-react";
 
 import {
   DEMO_GUIDED_ONBOARDING_ID,
-  calcGuidedProgress,
-  countCompletedVisibleSteps,
+  countDoneVisibleSteps,
+  followUpDateLabel,
   getCurrentStepIndex,
-  getIncompleteRequiredSteps,
+  getFirstUnansweredStepId,
   getNextVisibleStepId,
   getPreviousVisibleStepId,
   getStepOverviewStatus,
   getVisibleSteps,
   isStepAccessible,
+  isStepAnswered,
   isStepResponseComplete,
+  responsibleNames,
   type OnboardingInstance,
   type OnboardingStepInstance,
   type StepResponse,
 } from "@/lib/onboarding-steps";
 import { cn } from "@/lib/utils";
 import { useGuidedOnboardingStore } from "@/components/providers/guided-onboarding-provider";
+import { useLocale } from "@/components/providers/locale-provider";
 import { EmptyState } from "@/components/empty-state";
 import { LoadingState } from "@/components/loading-state";
 import { PageContainer } from "@/components/page-container";
+import { questionText } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,11 +52,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { knowledgeForStep } from "@/lib/knowledge-modules";
-import { exampleFor, questionById } from "@/lib/introduction-questions";
+import {
+  exampleFor,
+  helpTextFor,
+  placeholderFor,
+  questionById,
+} from "@/lib/introduction-questions";
+import {
+  alarmOptionFromFact,
+  normalizeAlarmOptionId,
+  savedFactFor,
+  sizedExample,
+} from "@/lib/company-facts";
+import { termsForQuestion } from "@/lib/terms";
+import { buildGuidedSummary } from "@/lib/guided-summary";
+import {
+  listParticipantDocuments,
+  uploadParticipantDocument,
+} from "@/lib/documents";
+import { POLICY_CARDS, policyExampleFor } from "@/lib/policy-cards";
 import {
   Sheet,
   SheetBody,
@@ -67,13 +91,16 @@ interface GuidedOnboardingViewProps {
 }
 
 export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
+  const { t, locale } = useLocale();
   const {
     getInstance,
     ensureDemoInstance,
     isHydrated,
     completeStep,
+    skipStep,
     updateStepResponse,
     setCurrentStep,
+    updateParticipantNote,
     resetInstance,
   } = useGuidedOnboardingStore();
 
@@ -81,20 +108,60 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   const [resetOpen, setResetOpen] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
   const [stepDrafts, setStepDrafts] = useState<Record<string, StepResponse>>({});
-  const [companyContext, setCompanyContext] = useState<{ industry: string; employeeCount: string; facts: Record<string, unknown> }>({ industry: "general", employeeCount: "", facts: {} });
+  const [noteDraft, setNoteDraft] = useState("");
+  const [attachments, setAttachments] = useState<Array<{ id: string; title: string }>>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [companyContext, setCompanyContext] = useState<{
+    companyName: string;
+    industry: string;
+    employeeCount: string;
+    facts: Record<string, unknown>;
+  }>({ companyName: "", industry: "general", employeeCount: "", facts: {} });
+  const didOpenSyncRef = useRef<string | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      const { data: user } = await supabase.auth.getUser();
-      const { data: member } = await supabase.from("organization_members").select("organization_id").eq("user_id", user.user?.id).limit(1).maybeSingle();
-      if (!member?.organization_id) return;
-      const [{ data: settings }, { data: facts }] = await Promise.all([
-        supabase.from("company_settings").select("industry,employee_count").eq("organization_id", member.organization_id).maybeSingle(),
-        supabase.from("company_facts").select("work_hours,sick_contact,safety_rep,policies,has_alarm,follow_up_days").eq("organization_id", member.organization_id).maybeSingle(),
-      ]);
-      setCompanyContext({ industry: settings?.industry ?? "general", employeeCount: settings?.employee_count ?? "", facts: facts ?? {} });
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const { isRegistryMissingError } = await import("@/lib/registry-errors");
+        const supabase = createClient();
+        const { data: user } = await supabase.auth.getUser();
+        const { data: member } = await supabase
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", user.user?.id)
+          .limit(1)
+          .maybeSingle();
+        if (!member?.organization_id) return;
+        const [settingsResult, factsResult] = await Promise.all([
+          supabase
+            .from("company_settings")
+            .select("company_name,industry,employee_count")
+            .eq("organization_id", member.organization_id)
+            .maybeSingle(),
+          supabase
+            .from("company_facts")
+            .select(
+              "start_date,start_place,first_day,work_hours,sick_contact,safety_rep,policies,has_alarm,follow_up_days"
+            )
+            .eq("organization_id", member.organization_id)
+            .maybeSingle(),
+        ]);
+        if (
+          isRegistryMissingError(settingsResult.error) ||
+          isRegistryMissingError(factsResult.error)
+        ) {
+          return;
+        }
+        setCompanyContext({
+          companyName: settingsResult.data?.company_name ?? "",
+          industry: settingsResult.data?.industry || "general",
+          employeeCount: settingsResult.data?.employee_count ?? "",
+          facts: factsResult.data ?? {},
+        });
+      } catch {
+        // Registry optional for an already started introduction.
+      }
     })();
   }, []);
 
@@ -105,6 +172,70 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   }, [ensureDemoInstance, id, isHydrated]);
 
   const instance = getInstance(id);
+
+  useEffect(() => {
+    if (!instance) return;
+    setNoteDraft(instance.participantNote ?? "");
+  }, [instance?.id, instance?.participantNote]);
+
+  useEffect(() => {
+    if (!instance || instance.id === DEMO_GUIDED_ONBOARDING_ID) {
+      setAttachments([]);
+      return;
+    }
+    let active = true;
+    void listParticipantDocuments(instance.id)
+      .then((rows) => {
+        if (!active) return;
+        setAttachments(rows.map((row) => ({ id: row.id, title: row.title })));
+      })
+      .catch(() => {
+        if (active) setAttachments([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [instance?.id]);
+
+  // Open on the first unanswered question once per visit.
+  useEffect(() => {
+    if (!isHydrated || !instance || instance.status === "completed") return;
+    if (didOpenSyncRef.current === id) return;
+    didOpenSyncRef.current = id;
+    const firstUnanswered = getFirstUnansweredStepId(instance);
+    if (firstUnanswered && instance.currentStepId !== firstUnanswered) {
+      setCurrentStep(instance.id, firstUnanswered);
+    }
+  }, [id, instance, isHydrated, setCurrentStep]);
+
+  useEffect(() => {
+    if (!instance) return;
+    const facts = companyContext.facts;
+    setStepDrafts((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const step of instance.steps) {
+        if (isStepAnswered(step)) continue;
+        const existing = { ...step.response, ...next[step.id] };
+        const fact = savedFactFor(step.id, facts);
+        const alarmOption =
+          step.id === "alarm"
+            ? normalizeAlarmOptionId(
+                existing.selectedOptionId ?? alarmOptionFromFact(facts.has_alarm)
+              )
+            : undefined;
+        const patch: StepResponse = {};
+        if (fact && !existing.comment) patch.comment = fact;
+        if (alarmOption && existing.selectedOptionId !== alarmOption) {
+          patch.selectedOptionId = alarmOption;
+        }
+        if (Object.keys(patch).length === 0) continue;
+        next[step.id] = { ...existing, ...patch };
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [companyContext.facts, instance]);
   const visibleSteps = useMemo(
     () => (instance ? getVisibleSteps(instance) : []),
     [instance]
@@ -112,17 +243,19 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   const currentStep = visibleSteps.find(
     (step) => step.id === instance?.currentStepId
   );
-  const rawProgress = instance ? calcGuidedProgress(instance) : 0;
+  const doneCount = instance ? countDoneVisibleSteps(instance) : 0;
+  const totalCount = visibleSteps.length;
+  const progressPercent = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
 
   useEffect(() => {
-    const timer = setTimeout(() => setAnimProgress(rawProgress), 300);
+    const timer = setTimeout(() => setAnimProgress(progressPercent), 300);
     return () => clearTimeout(timer);
-  }, [id, rawProgress]);
+  }, [id, progressPercent]);
 
   if (!isHydrated) {
     return (
       <PageContainer>
-        <LoadingState label="Laddar guidad onboarding..." />
+        <LoadingState label={t("common.loading")} />
       </PageContainer>
     );
   }
@@ -133,15 +266,15 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
         <Button variant="ghost" size="sm" className="-ml-3 w-fit" asChild>
           <Link href="/">
             <ArrowLeft />
-            Tillbaka
+            {t("common.back")}
           </Link>
         </Button>
         <EmptyState
-          title="Guidad onboarding hittades inte"
-          description="Den här förhandsvisningen finns inte i den här webbläsaren."
+          title={t("empty.noIntroductionTitle")}
+          description={t("empty.noIntroductionDescription")}
           action={
             <Button asChild>
-              <Link href="/">Gå till startsidan</Link>
+              <Link href="/">{t("empty.goHome")}</Link>
             </Button>
           }
         />
@@ -153,6 +286,8 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
     return (
       <GuidedCompletionView
         instance={instance}
+        industry={companyContext.industry}
+        companyName={companyContext.companyName}
         onReset={() => resetInstance(instance.id)}
       />
     );
@@ -169,20 +304,22 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   const activeStep = currentStep;
   const activeInstance = instance;
 
-  const completedCount = countCompletedVisibleSteps(activeInstance);
-  const totalCount = visibleSteps.length;
   const currentIndex = getCurrentStepIndex(activeInstance, visibleSteps);
   const isLastStep = currentIndex === visibleSteps.length - 1;
+  const isLocked = isStepAnswered(activeStep);
   const draftResponse = {
     ...activeStep.response,
     ...stepDrafts[activeStep.id],
   };
-  const canProceed = isStepResponseComplete({
+  const responseComplete = isStepResponseComplete({
     ...activeStep,
     response: draftResponse,
   });
+  // Friskvård, fack and larm may be skipped. Locked answers are view-only.
+  const canProceed = isLocked || !activeStep.required || responseComplete;
 
   function handleDraftChange(partial: StepResponse) {
+    if (isLocked) return;
     const next = { ...draftResponse, ...partial };
     setStepDrafts((current) => ({
       ...current,
@@ -192,12 +329,27 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   }
 
   async function handleNext() {
-    if (!canProceed) {
+    // Viewing an answered question: move forward without re-saving.
+    if (isLocked) {
+      if (isLastStep) return;
+      const nextStepId = getNextVisibleStepId(activeInstance, activeStep.id);
+      if (nextStepId) setCurrentStep(activeInstance.id, nextStepId);
+      return;
+    }
+
+    if (activeStep.required && !responseComplete) {
       toast.error("Slutför steget innan du går vidare.");
       return;
     }
 
-    completeStep(activeInstance.id, activeStep.id, draftResponse);
+    // Nästa sparar först, sedan går vidare.
+    if (responseComplete) {
+      completeStep(activeInstance.id, activeStep.id, draftResponse);
+    } else if (!activeStep.required) {
+      skipStep(activeInstance.id, activeStep.id);
+    } else {
+      updateStepResponse(activeInstance.id, activeStep.id, draftResponse);
+    }
 
     if (isLastStep) {
       return;
@@ -225,21 +377,44 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
     setOverviewOpen(false);
   }
 
+  function handleContinueUnanswered() {
+    const firstUnanswered = getFirstUnansweredStepId(activeInstance);
+    if (firstUnanswered) {
+      setCurrentStep(activeInstance.id, firstUnanswered);
+    }
+  }
+
+  async function handleAttachmentUpload(file: File | null) {
+    if (!file || activeInstance.id === DEMO_GUIDED_ONBOARDING_ID) return;
+    setUploadingAttachment(true);
+    try {
+      await uploadParticipantDocument(activeInstance.id, file);
+      const rows = await listParticipantDocuments(activeInstance.id);
+      setAttachments(rows.map((row) => ({ id: row.id, title: row.title })));
+      toast.success("Bilagan är sparad för den här personen.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Kunde inte ladda upp.");
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }
+
   return (
     <PageContainer className="flex flex-col gap-8 animate-fade-up sm:gap-10">
       <div className="flex items-center justify-between gap-3">
         <Button variant="ghost" size="sm" className="-ml-3 w-fit" asChild>
           <Link href="/">
             <ArrowLeft />
-            Tillbaka
+            {t("common.back")}
           </Link>
         </Button>
-        <Badge variant="outline">Förhandsvisning</Badge>
+        <Badge variant="outline">{t("home.readyTitle")}</Badge>
       </div>
 
       <div className="flex flex-col gap-1">
         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-primary/60">
-          {activeInstance.title}
+          {t("home.readyTitle")}
         </p>
         <h1 className="text-[1.6rem] font-semibold tracking-tight sm:text-3xl">
           {activeInstance.participantName}
@@ -249,27 +424,74 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
         </p>
       </div>
 
+      <Card className="flex flex-col gap-4 p-5 sm:p-6">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary/70">
+            Anteckning och bilaga
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Hör till {activeInstance.participantName}, inte till hela företaget.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="participant-note">Anteckning</Label>
+          <Textarea
+            id="participant-note"
+            value={noteDraft}
+            placeholder="Kort anteckning om introduktionen"
+            className="min-h-20 resize-none"
+            onChange={(event) => setNoteDraft(event.target.value)}
+            onBlur={() => updateParticipantNote(activeInstance.id, noteDraft)}
+          />
+        </div>
+        {activeInstance.id === DEMO_GUIDED_ONBOARDING_ID ? (
+          <p className="text-sm text-muted-foreground">Bilagor sparas inte i demon.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="participant-document">Dokument</Label>
+            <Input
+              id="participant-document"
+              type="file"
+              disabled={uploadingAttachment}
+              onChange={(event) => void handleAttachmentUpload(event.target.files?.[0] ?? null)}
+            />
+            {attachments.length > 0 ? (
+              <ul className="flex flex-col gap-1">
+                {attachments.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Paperclip className="size-3.5 shrink-0" />
+                    {item.title}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">Ingen bilaga ännu.</p>
+            )}
+          </div>
+        )}
+      </Card>
+
       <Card className="overflow-hidden p-0">
         <div className="flex flex-col gap-4 px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-primary/60">
-              Progress
+              {t("setup.questionLabel")}
             </p>
             <span className="text-sm text-muted-foreground">
-              Steg {currentIndex + 1} av {totalCount}
+              {t("common.questionOf", { current: currentIndex + 1, total: totalCount })}
             </span>
           </div>
           <div className="flex items-end justify-between gap-3">
-            <div className="flex items-baseline gap-1">
+            <div className="flex items-baseline gap-2">
               <span className="text-6xl font-extralight tabular-nums tracking-tighter leading-none text-foreground sm:text-7xl">
-                {rawProgress}
+                {doneCount}
               </span>
-              <span className="mb-1 text-xl font-light text-muted-foreground/50 sm:text-2xl">
-                %
+              <span className="mb-1 text-xl font-light text-muted-foreground sm:text-2xl">
+                av {totalCount}
               </span>
             </div>
             <span className="max-w-[14ch] text-right text-xs leading-relaxed text-muted-foreground sm:max-w-none sm:text-sm">
-              {completedCount} av {totalCount} steg klara
+              {doneCount} av {totalCount} frågor klara
             </span>
           </div>
         </div>
@@ -279,33 +501,46 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
       <Card className="flex flex-col gap-6 p-5 sm:p-6">
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{getStepTypeLabel(activeStep.type)}</Badge>
-            {activeStep.required && (
-              <Badge variant="default">Obligatoriskt</Badge>
+            <Badge variant="outline">{activeStep.description}</Badge>
+            {isLocked ? (
+              <Badge variant="outline">
+                <Lock className="size-3" />
+                Sparad
+              </Badge>
+            ) : activeStep.required ? (
+              <Badge variant="default">{t("common.required")}</Badge>
+            ) : (
+              <Badge variant="outline">{t("common.optional")}</Badge>
             )}
-            {activeStep.estimatedMinutes ? (
-              <span className="text-xs text-muted-foreground">
-                Ca {activeStep.estimatedMinutes} min
-              </span>
+            {activeStep.status === "skipped" ? (
+              <Badge variant="outline">{t("common.skip")}</Badge>
             ) : null}
           </div>
           <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-            {activeStep.title}
+            {questionText(locale, activeStep.id, "title") ?? activeStep.title}
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            {activeStep.description}
+            Nästa sparar svaret. Tillbaka går till föregående fråga.
           </p>
+          {isLocked ? (
+            <p className="text-sm text-muted-foreground">
+              Frågan är sparad. Du kan läsa svaret, men inte ändra det.
+            </p>
+          ) : null}
         </div>
 
-        <StepContent step={activeStep} response={draftResponse} onChange={handleDraftChange} industry={companyContext.industry} employeeCount={companyContext.employeeCount} facts={companyContext.facts} />
-
-        {activeStep.helpText ? (
-          <p className="rounded-2xl border border-border/80 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
-            {activeStep.helpText}
-          </p>
-        ) : null}
-
-        <p className="text-xs text-muted-foreground/70">Sparat i den här webbläsaren.</p>
+        <StepContent
+          step={activeStep}
+          response={draftResponse}
+          onChange={handleDraftChange}
+          industry={companyContext.industry}
+          employeeCount={companyContext.employeeCount}
+          companyName={companyContext.companyName}
+          facts={companyContext.facts}
+          managerName={responsibleNames(activeInstance).managerName}
+          mentorName={responsibleNames(activeInstance).mentorName}
+          readOnly={isLocked}
+        />
       </Card>
 
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -319,15 +554,28 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
           Stegöversikt
         </Button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setResetOpen(true)}
-          className="w-full sm:w-auto"
-        >
-          <RotateCcw />
-          Börja om
-        </Button>
+        {isLocked && getFirstUnansweredStepId(activeInstance) ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleContinueUnanswered}
+            className="w-full sm:w-auto"
+          >
+            Till obesvarad fråga
+          </Button>
+        ) : activeInstance.id === DEMO_GUIDED_ONBOARDING_ID ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setResetOpen(true)}
+            className="w-full sm:w-auto"
+          >
+            <RotateCcw />
+            Börja om
+          </Button>
+        ) : (
+          <span className="hidden sm:block" />
+        )}
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
@@ -346,8 +594,12 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
             disabled={!canProceed}
             className="w-full sm:w-auto"
           >
-            {isLastStep ? "Slutför" : "Nästa"}
-            {!isLastStep && <ArrowRight />}
+            {isLastStep && !isLocked
+              ? "Slutför"
+              : !isLocked && !activeStep.required && !responseComplete
+                ? "Hoppa över"
+                : "Nästa"}
+            {!(isLastStep && !isLocked) && <ArrowRight />}
           </Button>
         </div>
       </div>
@@ -373,71 +625,243 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
   );
 }
 
+function formatDisplayDate(value: unknown): string {
+  if (value == null || value === "") return "Datum saknas";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+    return new Date(text).toLocaleDateString("sv-SE");
+  }
+  return text;
+}
+
 function StepContent({
   step,
   response,
   onChange,
   industry,
   employeeCount,
+  companyName,
   facts,
+  managerName,
+  mentorName,
+  readOnly = false,
 }: {
   step: OnboardingStepInstance;
   response: StepResponse;
   onChange: (partial: StepResponse) => void;
   industry: string;
   employeeCount: string;
+  companyName: string;
   facts: Record<string, unknown>;
+  managerName: string;
+  mentorName: string;
+  readOnly?: boolean;
 }) {
+  const { t, locale } = useLocale();
+  const industryKey = industry || "general";
+  const example = exampleFor(step.id, industryKey, locale);
+  const help = helpTextFor(step.id, industryKey, locale) || step.helpText || "";
+  const saved = response.comment ?? savedFactFor(step.id, facts);
+  const alarmOption = normalizeAlarmOptionId(
+    response.selectedOptionId ?? alarmOptionFromFact(facts.has_alarm)
+  );
+  const question = questionById(step.id);
+  const relatedTerms = termsForQuestion(step.id);
+  const showAlarmPrefill =
+    !readOnly && step.id === "alarm" && facts.has_alarm === "Vi har inget larm";
+
+  const placeholder = placeholderFor(step.id, industryKey);
+  const confirmation =
+    question?.confirmationLabel ?? step.confirmationLabel ?? "Jag har tagit del av informationen.";
+  const sized = sizedExample(example, employeeCount);
+
+  if (step.id === "plan") {
+    const rows = [
+      { label: "Företag", value: companyName.trim() || "Företag saknas" },
+      { label: "Startdatum", value: formatDisplayDate(facts.start_date) },
+      { label: "Plats", value: String(facts.start_place || "").trim() || "Plats saknas" },
+      { label: "Ansvarig chef", value: managerName },
+      { label: "Mentor", value: mentorName },
+    ];
+    return (
+      <div className="flex flex-col gap-4">
+        {!readOnly && help ? (
+          <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
+        ) : null}
+        <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-4">
+          <dl className="flex flex-col gap-3 text-sm">
+            {rows.map((row) => (
+              <div key={row.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+                <dt className="min-w-36 font-semibold text-foreground">{row.label}</dt>
+                <dd className="text-muted-foreground">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {t("common.example")}: {sized}
+        </p>
+        {renderStepInteraction(step, response, onChange, readOnly, placeholder, confirmation)}
+      </div>
+    );
+  }
+
+  if (step.id === "followup") {
+    const bookedDate = /^\d{4}-\d{2}-\d{2}$/.test(saved ?? "")
+      ? saved
+      : savedFactFor("followup", facts) ?? "";
+    return (
+      <div className="flex flex-col gap-4">
+        {!readOnly && help ? (
+          <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
+        ) : null}
+        <p className="text-sm text-muted-foreground">
+          Välj datum för uppföljningen. Nästa sparar bokningen.
+        </p>
+        {!readOnly && sized ? (
+          <p className="text-sm text-muted-foreground">
+          {t("common.example")}: {sized}
+        </p>
+        ) : null}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="followup-date">Uppföljningsdatum</Label>
+          <Input
+            id="followup-date"
+            type="date"
+            value={bookedDate ?? ""}
+            readOnly={readOnly}
+            disabled={readOnly}
+            onChange={(event) =>
+              onChange({ comment: event.target.value, taskConfirmed: Boolean(event.target.value) })
+            }
+          />
+        </div>
+        <label
+          htmlFor={`task-${step.order}`}
+          className={cn(
+            "flex items-center gap-3.5 rounded-[1.35rem] border px-4 py-4",
+            "transition-all duration-200 select-none",
+            readOnly ? "cursor-default opacity-90" : "cursor-pointer",
+            response.taskConfirmed
+              ? "border-success/30 bg-success-subtle shadow-[0_0_0_3px_rgba(16,185,129,0.08)]"
+              : "border-border bg-secondary/40 hover:bg-secondary hover:border-border/80"
+          )}
+        >
+          <Checkbox
+            id={`task-${step.order}`}
+            checked={response.taskConfirmed === true}
+            disabled={readOnly || !bookedDate}
+            onCheckedChange={(value) => onChange({ taskConfirmed: value === true })}
+          />
+          <span className="text-sm font-medium leading-snug">{confirmation}</span>
+        </label>
+      </div>
+    );
+  }
+
+  if (step.id === "policy") {
+    const industryExample = sizedExample(policyExampleFor(industryKey), employeeCount);
+    return (
+      <div className="flex flex-col gap-4">
+        {!readOnly && help ? (
+          <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
+        ) : null}
+        <p className="text-sm text-muted-foreground">
+          Korta kort: titel, en mening och exempel. Inte en dokumentvy.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {POLICY_CARDS.map((card) => (
+            <article key={card.title} className="rounded-2xl border px-4 py-3 text-left">
+              <h3 className="font-semibold">{card.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{card.sentence}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t("common.example")}: {card.example}
+              </p>
+            </article>
+          ))}
+        </div>
+        {!readOnly && industryExample ? (
+          <p className="text-sm text-muted-foreground">
+            {t("common.example")}: {industryExample}
+          </p>
+        ) : null}
+        {saved && !readOnly ? (
+          <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+            <p className="text-sm leading-relaxed text-foreground">{saved}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Bekräfta att det stämmer, eller ändra vid behov.
+            </p>
+          </div>
+        ) : null}
+        {renderStepInteraction(step, response, onChange, readOnly, placeholder, confirmation)}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      {step.content && step.type !== "task" ? (
-        <div className="rounded-[1.35rem] border border-accent-foreground/10 bg-accent/60 px-4 py-4 sm:px-5">
-          <p className="text-sm leading-relaxed text-accent-foreground/90">
-            {step.content}
+      {!readOnly && help ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
+      ) : null}
+
+      {!readOnly && relatedTerms[0] ? (
+        <p className="text-sm text-muted-foreground">
+          {relatedTerms[0].term}: {relatedTerms[0].definition}
+        </p>
+      ) : null}
+
+      {showAlarmPrefill ? (
+        <p className="text-sm text-muted-foreground">
+          Valet är ifyllt från grundinställningen: Vi har inget larm.
+        </p>
+      ) : saved && step.type === "confirmation" && !readOnly ? (
+        <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+          <p className="text-sm leading-relaxed text-foreground">{saved}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Bekräfta att det stämmer, eller ändra vid behov.
           </p>
         </div>
       ) : null}
 
-      {questionById(step.id) ? (
-        <details className="rounded-2xl border bg-white/70 px-4 py-3 text-sm">
-          <summary className="cursor-pointer font-semibold text-[#0e7490]">Hjälp</summary>
-          <p className="mt-2 leading-relaxed text-neutral-600">{questionById(step.id)?.helpText}</p>
-        </details>
-      ) : step.helpText ? <p className="text-sm leading-relaxed text-neutral-600">{step.helpText}</p> : null}
-      {exampleFor(step.id, industry) ? <p className="text-sm text-neutral-500">Exempel: {shortExample(exampleFor(step.id, industry), employeeCount)}</p> : null}
+      {!readOnly && sized ? (
+        <p className="text-sm text-muted-foreground">
+          {t("common.example")}: {sized}
+        </p>
+      ) : null}
 
-      {renderStepInteraction(step, {
-        ...response,
-        selectedOptionId: response.selectedOptionId ?? (step.id === "alarm" && facts.has_alarm === "Vi har inget larm" ? "no-alarm" : undefined),
-        comment: response.comment ?? savedFactFor(step.id, facts),
-      }, onChange)}
+      {step.type === "singleChoice" && !readOnly ? (
+        <p className="text-sm text-muted-foreground">Välj ett alternativ.</p>
+      ) : null}
+
+      {step.type === "task" && !readOnly ? (
+        <p className="text-sm text-muted-foreground">Platshållare: {placeholder}</p>
+      ) : null}
+
+      {renderStepInteraction(
+        step,
+        {
+          ...response,
+          ...(step.id === "alarm" && alarmOption
+            ? { selectedOptionId: alarmOption }
+            : {}),
+          ...(step.id !== "alarm" && saved ? { comment: saved } : {}),
+        },
+        onChange,
+        readOnly,
+        placeholder,
+        confirmation
+      )}
     </div>
   );
-}
-
-function savedFactFor(stepId: string, facts: Record<string, unknown>) {
-  if (stepId === "hours") {
-    const parts = [facts.work_hours, facts.sick_contact].filter((value) => value != null && value !== "");
-    return parts.length ? parts.join(". Sjuk anmäls till ") : undefined;
-  }
-  if (stepId === "followup") {
-    const days = facts.follow_up_days == null || facts.follow_up_days === "" ? 14 : facts.follow_up_days;
-    return `Uppföljning om ${days} dagar.`;
-  }
-  const keys: Record<string, string> = { safety: "safety_rep", policy: "policies", alarm: "has_alarm" };
-  const value = facts[keys[stepId]];
-  return value == null || value === "" ? undefined : String(value);
-}
-
-function shortExample(value: string, employeeCount: string) {
-  if (employeeCount !== "1–5") return value;
-  return value.replace(/[^.!?]+(ansvarig|ansvariga|chef)[^.!?]*[.!?]?/gi, "").replace(/\s{2,}/g, " ").trim() || value;
 }
 
 function renderStepInteraction(
   step: OnboardingStepInstance,
   response: StepResponse,
-  onChange: (partial: StepResponse) => void
+  onChange: (partial: StepResponse) => void,
+  readOnly = false,
+  placeholder = "Skriv svaret",
+  confirmation = "Jag har tagit del av informationen."
 ) {
   switch (step.type) {
     case "information":
@@ -445,40 +869,49 @@ function renderStepInteraction(
     case "confirmation":
       return (
         <label
-          htmlFor={`confirm-${step.id}`}
+          htmlFor={`confirm-${step.order}`}
           className={cn(
-            "flex cursor-pointer items-center gap-3.5 rounded-[1.35rem] border px-4 py-4",
+            "flex items-center gap-3.5 rounded-[1.35rem] border px-4 py-4",
             "transition-all duration-200 select-none",
+            readOnly ? "cursor-default opacity-90" : "cursor-pointer",
             response.acknowledged
               ? "border-success/30 bg-success-subtle shadow-[0_0_0_3px_rgba(16,185,129,0.08)]"
               : "border-border bg-secondary/40 hover:bg-secondary hover:border-border/80"
           )}
         >
           <Checkbox
-            id={`confirm-${step.id}`}
+            id={`confirm-${step.order}`}
             checked={response.acknowledged === true}
+            disabled={readOnly}
             onCheckedChange={(value) =>
               onChange({ acknowledged: value === true })
             }
           />
-          <span className="text-sm font-medium leading-snug">
-            {step.confirmationLabel ?? "Jag har tagit del av informationen."}
-          </span>
+          <span className="text-sm font-medium leading-snug">{confirmation}</span>
         </label>
       );
     case "singleChoice":
       return (
         <div className="flex flex-col gap-2">
           {step.options?.map((option) => {
-            const selected = response.selectedOptionId === option.id;
+            const optionId =
+              step.id === "alarm"
+                ? normalizeAlarmOptionId(option.id) ?? option.id
+                : option.id;
+            const selected =
+              normalizeAlarmOptionId(response.selectedOptionId) ===
+                normalizeAlarmOptionId(optionId) ||
+              response.selectedOptionId === option.id;
             return (
               <button
-                key={option.id}
+                key={option.label}
                 type="button"
-                onClick={() => onChange({ selectedOptionId: option.id })}
+                disabled={readOnly}
+                onClick={() => onChange({ selectedOptionId: optionId })}
                 className={cn(
                   "rounded-[1.35rem] border px-4 py-4 text-left text-sm font-medium transition-all duration-200",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                  "disabled:cursor-default disabled:opacity-90",
                   selected
                     ? "border-primary/30 bg-primary/5 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]"
                     : "border-border bg-secondary/30 hover:bg-accent/40"
@@ -493,48 +926,42 @@ function renderStepInteraction(
     case "task":
       return (
         <div className="flex flex-col gap-4">
-          {step.content ? (
-            <div className="rounded-[1.35rem] border border-accent-foreground/10 bg-accent/60 px-4 py-4 sm:px-5">
-              <p className="text-sm leading-relaxed text-accent-foreground/90">
-                {step.content}
-              </p>
-            </div>
-          ) : null}
           <div className="flex flex-col gap-2">
             <Label
-              htmlFor={`task-comment-${step.id}`}
+              htmlFor={`task-comment-${step.order}`}
               className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70"
             >
-              Kommentar (valfritt)
+              Svar
             </Label>
             <Textarea
-              id={`task-comment-${step.id}`}
+              id={`task-comment-${step.order}`}
               value={response.comment ?? ""}
+              readOnly={readOnly}
               onChange={(event) => onChange({ comment: event.target.value })}
-              placeholder={questionById(step.id)?.placeholder ?? "Skriv svaret"}
+              placeholder={placeholder}
               className="min-h-24 resize-none"
             />
           </div>
           <label
-            htmlFor={`task-${step.id}`}
+            htmlFor={`task-${step.order}`}
             className={cn(
-              "flex cursor-pointer items-center gap-3.5 rounded-[1.35rem] border px-4 py-4",
+              "flex items-center gap-3.5 rounded-[1.35rem] border px-4 py-4",
               "transition-all duration-200 select-none",
+              readOnly ? "cursor-default opacity-90" : "cursor-pointer",
               response.taskConfirmed
                 ? "border-success/30 bg-success-subtle shadow-[0_0_0_3px_rgba(16,185,129,0.08)]"
                 : "border-border bg-secondary/40 hover:bg-secondary hover:border-border/80"
             )}
           >
             <Checkbox
-              id={`task-${step.id}`}
+              id={`task-${step.order}`}
               checked={response.taskConfirmed === true}
+              disabled={readOnly}
               onCheckedChange={(value) =>
                 onChange({ taskConfirmed: value === true })
               }
             />
-            <span className="text-sm font-medium leading-snug">
-              Jag bekräftar att uppgiften är genomförd
-            </span>
+            <span className="text-sm font-medium leading-snug">{confirmation}</span>
           </label>
         </div>
       );
@@ -556,13 +983,14 @@ function StepOverviewSheet({
   visibleSteps: OnboardingStepInstance[];
   onJump: (stepId: string) => void;
 }) {
+  const { t, locale } = useLocale();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>Stegöversikt</SheetTitle>
+          <SheetTitle>{t("home.readyTitle")}</SheetTitle>
           <SheetDescription>
-            Se alla steg och hoppa till ett steg du redan har besökt.
+            {t("common.oneQuestionAtATime")}
           </SheetDescription>
         </SheetHeader>
 
@@ -583,6 +1011,8 @@ function StepOverviewSheet({
                   status === "current" && "border-primary/25 bg-primary/5",
                   status === "completed" &&
                     "border-success/20 bg-success-subtle/35 hover:bg-success-subtle/50",
+                  status === "skipped" &&
+                    "border-border bg-secondary/30 hover:bg-secondary/40",
                   status === "available" &&
                     "border-border bg-card hover:bg-accent/25",
                   status === "locked" &&
@@ -593,7 +1023,9 @@ function StepOverviewSheet({
                   className={cn(
                     "flex size-5 shrink-0 items-center justify-center rounded-full",
                     status === "completed"
-                      ? "bg-success text-white"
+                      ? "bg-success text-success-foreground"
+                      : status === "skipped"
+                        ? "bg-muted text-muted-foreground"
                       : status === "current"
                         ? "border-2 border-primary bg-primary/10"
                         : "border-2 border-border"
@@ -601,6 +1033,8 @@ function StepOverviewSheet({
                 >
                   {status === "completed" ? (
                     <Check className="size-3" strokeWidth={3} />
+                  ) : status === "skipped" ? (
+                    <span className="text-[0.55rem] font-semibold">–</span>
                   ) : (
                     <span className="text-[0.65rem] font-semibold text-muted-foreground">
                       {index + 1}
@@ -608,10 +1042,14 @@ function StepOverviewSheet({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{step.title}</p>
+                  <p className="truncate text-sm font-medium">
+                    {questionText(locale, step.id, "title") ?? step.title}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {getOverviewStatusLabel(status)}
-                    {step.required ? " · Obligatoriskt" : ""}
+                    {step.required
+                      ? ` · ${t("common.required")}`
+                      : ` · ${t("common.optional")}`}
                   </p>
                 </div>
                 {accessible ? (
@@ -667,144 +1105,122 @@ function ResetDemoDialog({
 
 function GuidedCompletionView({
   instance,
+  industry,
+  companyName,
   onReset,
 }: {
   instance: OnboardingInstance;
+  industry: string;
+  companyName: string;
   onReset: () => void;
 }) {
   const [resetOpen, setResetOpen] = useState(false);
-  const visibleSteps = getVisibleSteps(instance);
-  const completedCount = countCompletedVisibleSteps(instance);
-  const incompleteRequired = getIncompleteRequiredSteps(instance);
+  const { managerName, mentorName } = responsibleNames(instance);
+  const followUpDate = followUpDateLabel(instance);
+  const isDemo = instance.id === DEMO_GUIDED_ONBOARDING_ID;
+  const summary = useMemo(
+    () => buildGuidedSummary(instance, industry, companyName),
+    [companyName, instance, industry]
+  );
+
+  function handlePrint() {
+    window.print();
+  }
 
   return (
     <PageContainer className="relative flex min-h-[80vh] flex-col items-center justify-center gap-8 py-12 text-center sm:gap-10 sm:py-16">
-      <div className="absolute left-0 top-0 pt-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/">
-            <ArrowLeft />
-            Tillbaka
-          </Link>
-        </Button>
-      </div>
-
-      <div className="flex flex-col items-center gap-7 animate-fade-up sm:gap-8">
-        <div className="flex size-[5.5rem] items-center justify-center rounded-full bg-success-subtle animate-scale-in sm:size-24">
+      <div className="no-print flex w-full max-w-lg flex-col items-center gap-7 animate-fade-up sm:gap-8">
+        <div className="flex size-22 items-center justify-center rounded-full bg-success-subtle animate-scale-in sm:size-24">
           <CheckCircle2 className="size-12 text-success" strokeWidth={1.5} />
         </div>
 
-        <div className="flex flex-col gap-2.5">
-          <h1 className="text-[2.1rem] font-semibold tracking-tight sm:text-5xl">
-            Onboarding slutförd!
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Klart</p>
+          <h1 className="text-[2rem] font-semibold tracking-tight sm:text-4xl">
+            Introduktionen är klar
           </h1>
-          <p className="max-w-md text-base text-muted-foreground">
-            {instance.participantName} har genomfört grundintroduktionen.
-          </p>
         </div>
 
-        <Card className="w-full max-w-md overflow-hidden p-0 text-left">
-          <div className="flex flex-col gap-4 px-5 py-5">
-            <div>
-              <p className="text-sm font-semibold">{instance.title}</p>
-              <p className="text-xs text-muted-foreground">
-                Ansvarig: {instance.responsibleName}
-              </p>
+        <Card className="w-full p-5 text-left sm:p-6">
+          <dl className="flex flex-col gap-3 text-sm">
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+              <dt className="min-w-36 font-semibold">Namn</dt>
+              <dd className="text-muted-foreground">{instance.participantName}</dd>
             </div>
-            <dl className="flex flex-col gap-0 text-sm">
-              {[
-                { label: "Progress", value: `${instance.progress}%` },
-                {
-                  label: "Slutförda steg",
-                  value: `${completedCount} av ${visibleSteps.length}`,
-                },
-                {
-                  label: "Slutförd",
-                  value: instance.completedAt
-                    ? new Date(instance.completedAt).toLocaleDateString("sv-SE")
-                    : "-",
-                },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex justify-between gap-2 py-1.5">
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd className="font-medium">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-          <div className="h-1 w-full bg-gradient-to-r from-success to-emerald-400" />
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+              <dt className="min-w-36 font-semibold">Företag</dt>
+              <dd className="text-muted-foreground">{companyName.trim() || "Företag saknas"}</dd>
+            </div>
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+              <dt className="min-w-36 font-semibold">Ansvarig chef</dt>
+              <dd className="text-muted-foreground">{managerName}</dd>
+            </div>
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+              <dt className="min-w-36 font-semibold">Mentor</dt>
+              <dd className="text-muted-foreground">{mentorName}</dd>
+            </div>
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+              <dt className="min-w-36 font-semibold">Uppföljningsdatum</dt>
+              <dd className="text-muted-foreground">{followUpDate}</dd>
+            </div>
+          </dl>
         </Card>
 
-        <Card className="w-full max-w-md p-5 text-left">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
-            Sammanfattning
-          </p>
-          {incompleteRequired.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-muted-foreground">Kvarstående obligatoriska steg:</p>
-              {incompleteRequired.map((step) => (
-                <p key={step.id} className="text-sm font-medium text-foreground">{step.title}</p>
-              ))}
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {visibleSteps.filter((step) => step.status === "completed").map((step) => (
-                <li key={step.id} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Check className="mt-0.5 size-4 shrink-0 text-success" />
-                  <span>{step.title}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <div className="flex w-full max-w-md flex-col gap-2 sm:w-auto">
-          <Button size="lg" className="w-full" asChild>
-            <Link href="/">
-              <ArrowLeft />
-              Startsidan
-            </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button size="lg" className="w-full sm:w-auto" type="button" onClick={handlePrint}>
+            Skriv ut
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="w-full"
-            onClick={() => setResetOpen(true)}
-          >
-            <RotateCcw />
-            Börja om demon
+          <Button size="lg" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link href="/">Tillbaka till startsidan</Link>
           </Button>
         </div>
 
-        <p className="text-xs text-muted-foreground/70">
-          Sparat i den här webbläsaren. Checklistan påverkas inte.
-        </p>
-        <ResetDemoDialog
-          open={resetOpen}
-          onOpenChange={setResetOpen}
-          onConfirm={() => {
-            onReset();
-            setResetOpen(false);
-          }}
-        />
+        {isDemo ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto"
+              onClick={() => setResetOpen(true)}
+            >
+              <RotateCcw />
+              Börja om demon
+            </Button>
+            <ResetDemoDialog
+              open={resetOpen}
+              onOpenChange={setResetOpen}
+              onConfirm={() => {
+                onReset();
+                setResetOpen(false);
+              }}
+            />
+          </>
+        ) : null}
       </div>
+
+      <article className="print-summary mx-auto mt-2 w-full max-w-3xl rounded-3xl border bg-card p-5 text-left sm:p-6">
+        <h2 className="text-xl font-semibold tracking-tight">{summary.title}</h2>
+        <dl className="mt-5 flex flex-col gap-2 text-sm">
+          {summary.meta.map((line) => (
+            <div key={line.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+              <dt className="min-w-40 font-semibold text-foreground">{line.label}</dt>
+              <dd className="text-muted-foreground">{line.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <h3 className="mt-8 text-base font-semibold">Frågor och svar</h3>
+        <ol className="mt-4 flex list-decimal flex-col gap-4 pl-5 text-sm">
+          {summary.questions.map((item) => (
+            <li key={item.order} className="pl-1">
+              <p className="font-medium text-foreground">{item.title}</p>
+              <p className="mt-1 text-muted-foreground">{item.answer}</p>
+            </li>
+          ))}
+        </ol>
+      </article>
     </PageContainer>
   );
-}
-
-function getStepTypeLabel(type: OnboardingStepInstance["type"]): string {
-  switch (type) {
-    case "information":
-      return "Information";
-    case "confirmation":
-      return "Bekräftelse";
-    case "singleChoice":
-      return "Val";
-    case "task":
-      return "Uppgift";
-    default:
-      return type;
-  }
 }
 
 function getOverviewStatusLabel(
@@ -812,15 +1228,15 @@ function getOverviewStatusLabel(
 ): string {
   switch (status) {
     case "completed":
-      return "Klart";
+      return "Svarad · låst";
     case "current":
-      return "Aktuellt steg";
+      return "Aktuell fråga";
     case "available":
-      return "Tillgängligt";
+      return "Tillgänglig";
     case "locked":
-      return "Inte påbörjat";
+      return "Inte öppnad ännu";
     case "skipped":
-      return "Hoppas över";
+      return "Överhoppad · låst";
     default:
       return status;
   }
