@@ -345,13 +345,6 @@ export default function HomePage() {
         )}
       </section>
 
-<<<<<<< HEAD
-      <section className="grid gap-3 sm:grid-cols-3">
-        <Link className="rounded-2xl border p-4" href="/ordlista"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad betyder orden?</p><p className="mt-2 font-semibold">Kunskapsbank</p></Link>
-        <Link className="rounded-2xl border p-4" href="/policyer"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Policyer</p><p className="mt-2 font-semibold">Företagets regler</p></Link>
-        <Link className="rounded-2xl border p-4" href="/historik"><p className="text-xs font-semibold uppercase tracking-wider text-primary/70">Vad har hänt?</p><p className="mt-2 font-semibold">Historik</p></Link>
-      </section>
-=======
       {ongoing.length > 0 ? (
         <section className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary/70">
@@ -461,7 +454,6 @@ export default function HomePage() {
           </Link>
         </section>
       ) : null}
->>>>>>> 4d83c69 (chore: enhance architecture documentation, remove env.local, and improve UI components)
     </PageContainer>
   );
 }
