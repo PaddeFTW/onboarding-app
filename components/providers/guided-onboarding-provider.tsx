@@ -34,7 +34,9 @@ interface GuidedOnboardingContextValue {
   addInstance: (instance: StoredGuidedInstance) => void;
   updateStepResponse: (instanceId: string, stepId: string, response: StepResponse) => void;
   completeStep: (instanceId: string, stepId: string, response: StepResponse, completedBy?: string) => void;
+  skipStep: (instanceId: string, stepId: string) => void;
   setCurrentStep: (instanceId: string, stepId: string) => void;
+  updateParticipantNote: (instanceId: string, note: string) => void;
   resetInstance: (instanceId: string) => void;
 }
 
@@ -69,6 +71,34 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
     };
   }, []);
 
+  const persistLatest = useCallback(
+    (instanceId: string, updater: (current: StoredGuidedInstance) => StoredGuidedInstance) => {
+      setInstances((current) => {
+        const existing = current.find((instance) => instance.id === instanceId);
+        if (!existing) return current;
+        const previousStatus = existing.status;
+        const next = asStored(recomputeInstanceState(updater(existing)));
+        void upsertGuidedInstance(next).catch((saveError: unknown) => {
+          setError(saveError instanceof Error ? saveError.message : "Kunde inte spara guidningen.");
+        });
+        if (previousStatus !== "completed" && next.status === "completed") {
+          void import("@/lib/history")
+            .then(({ recordEvent }) =>
+              recordEvent({
+                eventType: "introduction.completed",
+                resourceType: "guided_instance",
+                resourceId: next.id,
+                summary: `Introduktion slutförd: ${next.participantName}`,
+              })
+            )
+            .catch(() => undefined);
+        }
+        return [next, ...current.filter((item) => item.id !== instanceId)];
+      });
+    },
+    []
+  );
+
   const persist = useCallback((instance: StoredGuidedInstance) => {
     setInstances((current) => [
       instance,
@@ -80,9 +110,15 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const ensureDemoInstance = useCallback(() => {
-    if (instances.some((instance) => instance.id === DEMO_GUIDED_ONBOARDING_ID)) return;
-    persist(asStored(recomputeInstanceState(createDemoGuidedOnboarding())));
-  }, [instances, persist]);
+    setInstances((current) => {
+      if (current.some((instance) => instance.id === DEMO_GUIDED_ONBOARDING_ID)) {
+        return current;
+      }
+      const demo = asStored(recomputeInstanceState(createDemoGuidedOnboarding()));
+      void upsertGuidedInstance(demo);
+      return [demo, ...current];
+    });
+  }, []);
 
   const value = useMemo<GuidedOnboardingContextValue>(() => ({
     instances,
@@ -98,29 +134,39 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
     },
     addInstance: persist,
     updateStepResponse: (instanceId, stepId, response) => {
-      const current = instances.find((instance) => instance.id === instanceId);
-      if (!current) return;
-      persist(asStored(recomputeInstanceState(withUpdatedStep(current, stepId, (step) => ({
-        ...step,
-        status: step.status === "notStarted" ? "inProgress" : step.status,
-        response: { ...step.response, ...response },
-      })))));
+      persistLatest(instanceId, (current) =>
+        withUpdatedStep(current, stepId, (step) => ({
+          ...step,
+          status: step.status === "notStarted" ? "inProgress" : step.status,
+          response: { ...step.response, ...response },
+        })) as StoredGuidedInstance
+      );
     },
     completeStep: (instanceId, stepId, response, completedBy) => {
-      const current = instances.find((instance) => instance.id === instanceId);
-      if (!current) return;
-      persist(asStored(recomputeInstanceState(withUpdatedStep(current, stepId, (step) => ({
-        ...step,
-        status: "completed",
-        response: { ...step.response, ...response },
-        completedAt: new Date().toISOString(),
-        completedBy: completedBy ?? current.participantName,
-      })))));
+      persistLatest(instanceId, (current) =>
+        withUpdatedStep(current, stepId, (step) => ({
+          ...step,
+          status: "completed",
+          response: { ...step.response, ...response },
+          completedAt: new Date().toISOString(),
+          completedBy: completedBy ?? current.participantName,
+        })) as StoredGuidedInstance
+      );
+    },
+    skipStep: (instanceId, stepId) => {
+      persistLatest(instanceId, (current) => {
+        const step = current.steps.find((item) => item.id === stepId);
+        if (!step || step.required) return current;
+        return withUpdatedStep(current, stepId, (item) => ({
+          ...item,
+          status: "skipped",
+          completedAt: null,
+          completedBy: null,
+        })) as StoredGuidedInstance;
+      });
     },
     setCurrentStep: (instanceId, stepId) => {
-      const current = instances.find((instance) => instance.id === instanceId);
-      if (!current) return;
-      persist(asStored(recomputeInstanceState({
+      persistLatest(instanceId, (current) => ({
         ...current,
         currentStepId: stepId,
         status: current.status === "notStarted" ? "ongoing" : current.status,
@@ -129,13 +175,19 @@ export function GuidedOnboardingProvider({ children }: { children: ReactNode }) 
             ? { ...step, status: "inProgress" }
             : step
         ),
-      })));
+      }));
+    },
+    updateParticipantNote: (instanceId, note) => {
+      persistLatest(instanceId, (current) => ({
+        ...current,
+        participantNote: note,
+      }));
     },
     resetInstance: (instanceId) => {
       if (instanceId !== DEMO_GUIDED_ONBOARDING_ID) return;
       persist(asStored(recomputeInstanceState(createDemoGuidedOnboarding())));
     },
-  }), [ensureDemoInstance, instances, isHydrated, error, persist]);
+  }), [ensureDemoInstance, instances, isHydrated, error, persist, persistLatest]);
 
   return (
     <GuidedOnboardingContext.Provider value={value}>

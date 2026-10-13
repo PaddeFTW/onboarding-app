@@ -38,7 +38,11 @@ export function LoginScreen() {
     setLoading(null);
     if (otpError) {
       const message = otpError.message.toLowerCase();
-      setError(message.includes("after") || message.includes("rate") ? "Vänta en minut och skicka länken igen." : otpError.message);
+      setError(
+        message.includes("after") || message.includes("rate")
+          ? "Vänta en minut och skicka länken igen."
+          : "Kunde inte skicka mejllänken. Kontrollera adressen och försök igen."
+      );
       return;
     }
     setStatus("sent");
