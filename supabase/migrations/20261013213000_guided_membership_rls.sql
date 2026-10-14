@@ -3,8 +3,11 @@
 -- Assumes company_id already exists on guided_instances (AUDIT-003).
 
 -- ---------------------------------------------------------------------------
--- Function used by membership policies (same signature as foundation migration)
+-- Function used by membership policies
+-- Drop first so parameter name can change safely
 -- ---------------------------------------------------------------------------
+drop function if exists public.is_org_member(uuid);
+
 create or replace function public.is_org_member(p_org_id uuid)
 returns boolean
 language sql
