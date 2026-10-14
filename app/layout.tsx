@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AppBrand } from "@/components/app-brand";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { OnboardingProvider } from "@/components/providers/onboarding-provider";
 import { GuidedOnboardingProvider } from "@/components/providers/guided-onboarding-provider";
@@ -47,8 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <LocaleProvider>
             <OnboardingProvider>
               <GuidedOnboardingProvider>
-                <AppBrand />
-                {children}
+                <DashboardShell>{children}</DashboardShell>
                 <Toaster />
                 <Installer />
               </GuidedOnboardingProvider>
