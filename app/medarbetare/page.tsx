@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Plus, Search } from "lucide-react";
 
+import { StartIntroductionPanel } from "@/components/company/StartIntroductionPanel";
 import { LoadingState } from "@/components/loading-state";
 import { PageContainer } from "@/components/page-container";
 import { useLocale } from "@/components/providers/locale-provider";
@@ -24,43 +25,54 @@ export default function MedarbetarePage() {
   const [error, setError] = useState<string | null>(null);
   const [employees, setEmployees] = useState<RegistryEmployee[]>([]);
   const [introByName, setIntroByName] = useState<Record<string, IntroStatus>>({});
+  const [introIdByName, setIntroIdByName] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [prefillEmployee, setPrefillEmployee] = useState<RegistryEmployee | null>(
+    null
+  );
+
+  async function reload() {
+    setLoading(true);
+    try {
+      const [registry, guided] = await Promise.all([
+        loadCompanyRegistry(),
+        listGuidedInstances().catch(() => []),
+      ]);
+      if (!registry.ok) {
+        setError(registry.message);
+        setEmployees([]);
+        return;
+      }
+      setEmployees(registry.data.employees);
+      setError(null);
+
+      const statusMap: Record<string, IntroStatus> = {};
+      const idMap: Record<string, string> = {};
+      for (const employee of registry.data.employees) {
+        statusMap[employee.name] = "none";
+      }
+      for (const intro of guided) {
+        const current = statusMap[intro.participantName] ?? "none";
+        const rank = { none: 0, notStarted: 1, ongoing: 2, completed: 3 } as const;
+        const next = intro.status as Exclude<IntroStatus, "none">;
+        if (rank[next] >= rank[current]) {
+          statusMap[intro.participantName] = next;
+          idMap[intro.participantName] = intro.id;
+        }
+      }
+      setIntroByName(statusMap);
+      setIntroIdByName(idMap);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("registry.loadError"));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    void (async () => {
-      setLoading(true);
-      try {
-        const [registry, guided] = await Promise.all([
-          loadCompanyRegistry(),
-          listGuidedInstances().catch(() => []),
-        ]);
-        if (!registry.ok) {
-          setError(registry.message);
-          setEmployees([]);
-          return;
-        }
-        setEmployees(registry.data.employees);
-        setError(null);
-
-        const statusMap: Record<string, IntroStatus> = {};
-        for (const employee of registry.data.employees) {
-          statusMap[employee.name] = "none";
-        }
-        for (const intro of guided) {
-          const current = statusMap[intro.participantName] ?? "none";
-          const rank = { none: 0, notStarted: 1, ongoing: 2, completed: 3 } as const;
-          const next = intro.status as Exclude<IntroStatus, "none">;
-          if (rank[next] >= rank[current]) {
-            statusMap[intro.participantName] = next;
-          }
-        }
-        setIntroByName(statusMap);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t("registry.loadError"));
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
 
   const filtered = useMemo(() => {
@@ -78,6 +90,11 @@ export default function MedarbetarePage() {
     if (status === "ongoing") return t("home.statusOngoing");
     if (status === "notStarted") return t("home.statusNotStarted");
     return null;
+  }
+
+  function openStart(employee?: RegistryEmployee) {
+    setPrefillEmployee(employee ?? null);
+    setPanelOpen(true);
   }
 
   if (loading) {
@@ -103,12 +120,33 @@ export default function MedarbetarePage() {
             {t("employeesPage.description")}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/foretagsregister?tab=employees">{t("employeesPage.openRegistry")}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => openStart()}>
+            <Plus />
+            {t("company.startIntro")}
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/foretagsregister?tab=employees">{t("employeesPage.openRegistry")}</Link>
+          </Button>
+        </div>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {panelOpen ? (
+        <StartIntroductionPanel
+          prefillEmployee={prefillEmployee}
+          onCancel={() => {
+            setPanelOpen(false);
+            setPrefillEmployee(null);
+          }}
+          onStarted={() => {
+            setPanelOpen(false);
+            setPrefillEmployee(null);
+            void reload();
+          }}
+        />
+      ) : null}
 
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -123,15 +161,21 @@ export default function MedarbetarePage() {
       {filtered.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-border px-4 py-8 text-center">
           <p className="text-sm text-muted-foreground">{t("employeesPage.empty")}</p>
-          <Button className="mt-4" asChild>
-            <Link href="/foretagsregister?tab=employees">{t("employeesPage.openRegistry")}</Link>
-          </Button>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button type="button" onClick={() => openStart()}>
+              {t("company.startIntro")}
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/foretagsregister?tab=employees">{t("employeesPage.openRegistry")}</Link>
+            </Button>
+          </div>
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
           {filtered.map((employee) => {
             const status = introByName[employee.name] ?? "none";
             const label = introLabel(status);
+            const introId = introIdByName[employee.name];
             return (
               <li
                 key={employee.id}
@@ -153,9 +197,28 @@ export default function MedarbetarePage() {
                       {label ? <Badge variant="outline">{label}</Badge> : null}
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/foretagsregister?tab=employees">{t("common.open")}</Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {introId && status !== "none" ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/onboarding/guided/${introId}`}>
+                          {status === "completed"
+                            ? t("home.openReceipt")
+                            : t("home.openIntroduction")}
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => openStart(employee)}
+                      >
+                        {t("company.startIntro")}
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href="/foretagsregister?tab=employees">{t("common.open")}</Link>
+                    </Button>
+                  </div>
                 </div>
               </li>
             );

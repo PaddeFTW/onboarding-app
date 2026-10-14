@@ -56,25 +56,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  exampleFor,
-  helpTextFor,
-  placeholderFor,
-  questionById,
-} from "@/lib/introduction-questions";
+import { placeholderFor, questionById } from "@/lib/introduction-questions";
 import {
   alarmOptionFromFact,
   normalizeAlarmOptionId,
   savedFactFor,
   sizedExample,
 } from "@/lib/company-facts";
-import { termsForQuestion } from "@/lib/terms";
+import { buildGuidedStepSupport } from "@/lib/guided-step-context";
 import { buildGuidedSummary } from "@/lib/guided-summary";
 import {
   listParticipantDocuments,
   uploadParticipantDocument,
 } from "@/lib/documents";
 import { POLICY_CARDS, policyExampleFor } from "@/lib/policy-cards";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sheet,
   SheetBody,
@@ -142,7 +144,7 @@ export function GuidedOnboardingView({ id }: GuidedOnboardingViewProps) {
           supabase
             .from("company_facts")
             .select(
-              "start_date,start_place,first_day,work_hours,sick_contact,safety_rep,policies,has_alarm,follow_up_days"
+              "start_date,start_place,first_day,work_hours,sick_contact,safety_rep,policies,has_alarm,follow_up_days,accounts,equipment"
             )
             .eq("organization_id", member.organization_id)
             .maybeSingle(),
@@ -634,6 +636,80 @@ function formatDisplayDate(value: unknown): string {
   return text;
 }
 
+function StepSupportPanel({
+  explanation,
+  example,
+  companyFacts,
+  knowledge,
+  terms,
+  exampleLabel,
+  readOnly,
+}: {
+  explanation: string;
+  example: string;
+  companyFacts: Array<{ label: string; value: string }>;
+  knowledge: { title: string; text: string; source: string; module: string } | null;
+  terms: Array<{ term: string; definition: string }>;
+  exampleLabel: string;
+  readOnly: boolean;
+}) {
+  if (readOnly) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {explanation ? (
+        <div className="rounded-2xl border border-border bg-secondary/30 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Förklaring
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-foreground">{explanation}</p>
+        </div>
+      ) : null}
+
+      {companyFacts.length > 0 ? (
+        <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary/70">
+            Från företagsregistret
+          </p>
+          <dl className="mt-2 flex flex-col gap-2 text-sm">
+            {companyFacts.map((row) => (
+              <div key={row.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+                <dt className="min-w-36 font-semibold text-foreground">{row.label}</dt>
+                <dd className="text-muted-foreground">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
+
+      {knowledge ? (
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Kunskapsbank · {knowledge.module}
+          </p>
+          <p className="mt-1 font-semibold text-foreground">{knowledge.title}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{knowledge.text}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Källa: {knowledge.source}</p>
+        </div>
+      ) : null}
+
+      {terms[0] ? (
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{terms[0].term}</span>
+          {": "}
+          {terms[0].definition}
+          <span className="mt-1 block text-xs">Källa: ordlista / introduktion</span>
+        </p>
+      ) : null}
+
+      {example ? (
+        <p className="text-sm text-muted-foreground">
+          {exampleLabel}: {example}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function StepContent({
   step,
   response,
@@ -659,52 +735,70 @@ function StepContent({
 }) {
   const { t, locale } = useLocale();
   const industryKey = industry || "general";
-  const example = exampleFor(step.id, industryKey, locale);
-  const help = helpTextFor(step.id, industryKey, locale) || step.helpText || "";
+  const support = buildGuidedStepSupport({
+    step,
+    industry: industryKey,
+    employeeCount,
+    companyName,
+    facts,
+    locale,
+  });
   const saved = response.comment ?? savedFactFor(step.id, facts);
   const alarmOption = normalizeAlarmOptionId(
     response.selectedOptionId ?? alarmOptionFromFact(facts.has_alarm)
   );
   const question = questionById(step.id);
-  const relatedTerms = termsForQuestion(step.id);
   const showAlarmPrefill =
     !readOnly && step.id === "alarm" && facts.has_alarm === "Vi har inget larm";
 
   const placeholder = placeholderFor(step.id, industryKey);
   const confirmation =
     question?.confirmationLabel ?? step.confirmationLabel ?? "Jag har tagit del av informationen.";
-  const sized = sizedExample(example, employeeCount);
+  const stepWithOptions =
+    step.options?.length || !support.options.length
+      ? step
+      : { ...step, options: support.options };
 
-  if (step.id === "plan") {
-    const rows = [
-      { label: "Företag", value: companyName.trim() || "Företag saknas" },
-      { label: "Startdatum", value: formatDisplayDate(facts.start_date) },
-      { label: "Plats", value: String(facts.start_place || "").trim() || "Plats saknas" },
-      { label: "Ansvarig chef", value: managerName },
-      { label: "Mentor", value: mentorName },
-    ];
-    return (
-      <div className="flex flex-col gap-4">
-        {!readOnly && help ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
-        ) : null}
-        <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-4">
-          <dl className="flex flex-col gap-3 text-sm">
-            {rows.map((row) => (
-              <div key={row.label} className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
-                <dt className="min-w-36 font-semibold text-foreground">{row.label}</dt>
-                <dd className="text-muted-foreground">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t("common.example")}: {sized}
-        </p>
-        {renderStepInteraction(step, response, onChange, readOnly, placeholder, confirmation)}
-      </div>
-    );
-  }
+  const supportPanel = (
+    <StepSupportPanel
+      explanation={support.explanation}
+      example={
+        step.id === "policy"
+          ? sizedExample(policyExampleFor(industryKey), employeeCount) || support.example
+          : support.example
+      }
+      companyFacts={
+        step.id === "plan"
+          ? [
+              {
+                label: "Företag",
+                value: companyName.trim() || "Företag saknas",
+              },
+              {
+                label: "Startdatum",
+                value: formatDisplayDate(facts.start_date),
+              },
+              {
+                label: "Plats",
+                value: String(facts.start_place || "").trim() || "Plats saknas",
+              },
+              { label: "Ansvarig chef", value: managerName },
+              { label: "Mentor", value: mentorName },
+              ...support.companyFacts.filter(
+                (row) =>
+                  row.label !== "Företag" &&
+                  row.label !== "Startdatum" &&
+                  row.label !== "Plats"
+              ),
+            ]
+          : support.companyFacts
+      }
+      knowledge={support.knowledge}
+      terms={support.terms}
+      exampleLabel={t("common.example")}
+      readOnly={readOnly}
+    />
+  );
 
   if (step.id === "followup") {
     const bookedDate = /^\d{4}-\d{2}-\d{2}$/.test(saved ?? "")
@@ -712,17 +806,10 @@ function StepContent({
       : savedFactFor("followup", facts) ?? "";
     return (
       <div className="flex flex-col gap-4">
-        {!readOnly && help ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
-        ) : null}
+        {supportPanel}
         <p className="text-sm text-muted-foreground">
           Välj datum för uppföljningen. Nästa sparar bokningen.
         </p>
-        {!readOnly && sized ? (
-          <p className="text-sm text-muted-foreground">
-          {t("common.example")}: {sized}
-        </p>
-        ) : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="followup-date">Uppföljningsdatum</Label>
           <Input
@@ -760,12 +847,9 @@ function StepContent({
   }
 
   if (step.id === "policy") {
-    const industryExample = sizedExample(policyExampleFor(industryKey), employeeCount);
     return (
       <div className="flex flex-col gap-4">
-        {!readOnly && help ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
-        ) : null}
+        {supportPanel}
         <p className="text-sm text-muted-foreground">
           Korta kort: titel, en mening och exempel. Inte en dokumentvy.
         </p>
@@ -780,52 +864,31 @@ function StepContent({
             </article>
           ))}
         </div>
-        {!readOnly && industryExample ? (
-          <p className="text-sm text-muted-foreground">
-            {t("common.example")}: {industryExample}
-          </p>
-        ) : null}
-        {saved && !readOnly ? (
-          <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
-            <p className="text-sm leading-relaxed text-foreground">{saved}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Bekräfta att det stämmer, eller ändra vid behov.
-            </p>
+        {!readOnly ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`policy-note-${step.order}`}>Eget svar eller justering</Label>
+            <Textarea
+              id={`policy-note-${step.order}`}
+              value={response.comment ?? saved ?? ""}
+              readOnly={readOnly}
+              onChange={(event) => onChange({ comment: event.target.value })}
+              placeholder={placeholder}
+              className="min-h-20 resize-none"
+            />
           </div>
         ) : null}
-        {renderStepInteraction(step, response, onChange, readOnly, placeholder, confirmation)}
+        {renderStepInteraction(stepWithOptions, response, onChange, readOnly, placeholder, confirmation)}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {!readOnly && help ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">{help}</p>
-      ) : null}
-
-      {!readOnly && relatedTerms[0] ? (
-        <p className="text-sm text-muted-foreground">
-          {relatedTerms[0].term}: {relatedTerms[0].definition}
-        </p>
-      ) : null}
+      {supportPanel}
 
       {showAlarmPrefill ? (
         <p className="text-sm text-muted-foreground">
           Valet är ifyllt från grundinställningen: Vi har inget larm.
-        </p>
-      ) : saved && step.type === "confirmation" && !readOnly ? (
-        <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3">
-          <p className="text-sm leading-relaxed text-foreground">{saved}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Bekräfta att det stämmer, eller ändra vid behov.
-          </p>
-        </div>
-      ) : null}
-
-      {!readOnly && sized ? (
-        <p className="text-sm text-muted-foreground">
-          {t("common.example")}: {sized}
         </p>
       ) : null}
 
@@ -837,14 +900,32 @@ function StepContent({
         <p className="text-sm text-muted-foreground">Platshållare: {placeholder}</p>
       ) : null}
 
+      {step.type === "confirmation" && !readOnly ? (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`confirm-note-${step.order}`}>Eget svar eller justering</Label>
+          <Textarea
+            id={`confirm-note-${step.order}`}
+            value={response.comment ?? saved ?? ""}
+            onChange={(event) => onChange({ comment: event.target.value })}
+            placeholder={placeholder}
+            className="min-h-20 resize-none"
+          />
+        </div>
+      ) : null}
+
       {renderStepInteraction(
-        step,
+        stepWithOptions,
         {
           ...response,
           ...(step.id === "alarm" && alarmOption
             ? { selectedOptionId: alarmOption }
             : {}),
-          ...(step.id !== "alarm" && saved ? { comment: saved } : {}),
+          ...(step.id !== "alarm" &&
+          step.type === "task" &&
+          saved &&
+          response.comment == null
+            ? { comment: saved }
+            : {}),
         },
         onChange,
         readOnly,
@@ -890,24 +971,86 @@ function renderStepInteraction(
           <span className="text-sm font-medium leading-snug">{confirmation}</span>
         </label>
       );
-    case "singleChoice":
+    case "singleChoice": {
+      const options = step.options ?? [];
+      const currentValue =
+        step.id === "alarm"
+          ? normalizeAlarmOptionId(response.selectedOptionId) ?? ""
+          : response.selectedOptionId ?? "";
+
+      if (step.id === "alarm" && options.length > 0) {
+        return (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`select-${step.order}`}>Alternativ</Label>
+              <Select
+                value={currentValue || undefined}
+                disabled={readOnly}
+                onValueChange={(value) =>
+                  onChange({
+                    selectedOptionId:
+                      normalizeAlarmOptionId(value) ?? value,
+                  })
+                }
+              >
+                <SelectTrigger id={`select-${step.order}`}>
+                  <SelectValue placeholder="Välj larmalternativ" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => {
+                    const optionId =
+                      normalizeAlarmOptionId(option.id) ?? option.id;
+                    return (
+                      <SelectItem key={optionId} value={optionId}>
+                        {option.label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2" role="radiogroup" aria-label={step.title}>
+              {options.map((option) => {
+                const optionId = normalizeAlarmOptionId(option.id) ?? option.id;
+                const selected = currentValue === optionId;
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={readOnly}
+                    onClick={() => onChange({ selectedOptionId: optionId })}
+                    className={cn(
+                      "rounded-[1.35rem] border px-4 py-4 text-left text-sm font-medium transition-all duration-200",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                      "disabled:cursor-default disabled:opacity-90",
+                      selected
+                        ? "border-primary/30 bg-primary/5 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]"
+                        : "border-border bg-secondary/30 hover:bg-accent/40"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
       return (
-        <div className="flex flex-col gap-2">
-          {step.options?.map((option) => {
-            const optionId =
-              step.id === "alarm"
-                ? normalizeAlarmOptionId(option.id) ?? option.id
-                : option.id;
-            const selected =
-              normalizeAlarmOptionId(response.selectedOptionId) ===
-                normalizeAlarmOptionId(optionId) ||
-              response.selectedOptionId === option.id;
+        <div className="flex flex-col gap-2" role="radiogroup" aria-label={step.title}>
+          {options.map((option) => {
+            const selected = response.selectedOptionId === option.id;
             return (
               <button
                 key={option.label}
                 type="button"
+                role="radio"
+                aria-checked={selected}
                 disabled={readOnly}
-                onClick={() => onChange({ selectedOptionId: optionId })}
+                onClick={() => onChange({ selectedOptionId: option.id })}
                 className={cn(
                   "rounded-[1.35rem] border px-4 py-4 text-left text-sm font-medium transition-all duration-200",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -923,6 +1066,7 @@ function renderStepInteraction(
           })}
         </div>
       );
+    }
     case "task":
       return (
         <div className="flex flex-col gap-4">
